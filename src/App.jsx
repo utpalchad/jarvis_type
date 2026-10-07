@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CoreScene from './components/CoreScene.jsx'
 import ContextHud from './components/ContextHud.jsx'
 
@@ -10,6 +10,8 @@ const activeModules = [
   ['PLANNING & AUTOMATION', 78],
   ['VISION & MULTIMODAL', 72],
 ]
+
+const WAKE_PHRASE = 'hey adonis'
 
 const quickCommands = [
   ['REASON', 'Help me reason through this problem step by step.'],
@@ -31,6 +33,11 @@ function App() {
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [wakeEnabled, setWakeEnabled] = useState(false)
+  const [wakeListening, setWakeListening] = useState(false)
+  const wakeRecognitionRef = useRef(null)
+  const wakeEnabledRef = useRef(false)
+  const wakeRestartAllowedRef = useRef(false)
   const [aiOnline, setAiOnline] = useState(false)
   const [interactionId, setInteractionId] = useState(null)
   const [chatHistory, setChatHistory] = useState([])
@@ -53,6 +60,19 @@ function App() {
   useEffect(() => {
     const timer = window.setTimeout(() => setBooted(true), 2300)
     return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      wakeEnabledRef.current = false
+      wakeRestartAllowedRef.current = false
+      try {
+        wakeRecognitionRef.current?.stop()
+      } catch {
+        // Recognition may already be stopped.
+      }
+      wakeRecognitionRef.current = null
+    }
   }, [])
 
   useEffect(() => {
@@ -86,6 +106,7 @@ function App() {
     const clean = String(text || '').trim()
     if (!clean || status === 'PROCESSING') return
 
+    pauseWakeRecognition()
     window.speechSynthesis?.cancel()
     setCommand('')
     setLastCommand(clean)
@@ -128,17 +149,26 @@ function App() {
       setAiOnline(true)
 
       if (voiceEnabled) {
-        speak(data.reply)
+        speak(data.reply, () => {
+          setStatus('STANDBY')
+          resumeWakeRecognition()
+        })
       } else {
         setStatus('READY')
-        window.setTimeout(() => setStatus('STANDBY'), 1600)
+        window.setTimeout(() => {
+          setStatus('STANDBY')
+          resumeWakeRecognition()
+        }, 900)
       }
 
     } catch (requestError) {
       setStatus('ERROR')
       setError(requestError.message)
       setReply('Neural link unavailable.')
-      window.setTimeout(() => setStatus('STANDBY'), 3200)
+      window.setTimeout(() => {
+        setStatus('STANDBY')
+        resumeWakeRecognition()
+      }, 1800)
     }
   }
 
@@ -147,14 +177,151 @@ function App() {
     sendCommand(command)
   }
 
-  function startListening() {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition
+  function getSpeechRecognition() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition
+  }
+
+  function wakeGreeting() {
+    const hour = new Date().getHours()
+    const period =
+      hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+
+    return period + '. ADONIS online. What can I do for you?'
+  }
+
+  function pauseWakeRecognition() {
+    wakeRestartAllowedRef.current = false
+
+    try {
+      wakeRecognitionRef.current?.stop()
+    } catch {
+      // Recognition may already be stopped.
+    }
+  }
+
+  function resumeWakeRecognition() {
+    if (!wakeEnabledRef.current) return
+    window.setTimeout(() => startWakeRecognition(), 350)
+  }
+
+  function startWakeRecognition() {
+    if (!wakeEnabledRef.current || wakeRecognitionRef.current) return
+
+    const SpeechRecognition = getSpeechRecognition()
+
+    if (!SpeechRecognition) {
+      wakeEnabledRef.current = false
+      setWakeEnabled(false)
+      setError('Wake phrase requires Chrome or Edge speech recognition support.')
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    wakeRecognitionRef.current = recognition
+    wakeRestartAllowedRef.current = true
+
+    recognition.lang = 'en-IN'
+    recognition.interimResults = true
+    recognition.continuous = true
+
+    recognition.onstart = () => {
+      setWakeListening(true)
+      setError('')
+    }
+
+    recognition.onresult = (event) => {
+      let transcript = ''
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        transcript += ' ' + (event.results[index]?.[0]?.transcript || '')
+      }
+
+      if (!transcript.toLowerCase().includes(WAKE_PHRASE)) return
+
+      wakeRestartAllowedRef.current = false
+
+      try {
+        recognition.stop()
+      } catch {
+        // Recognition may already be stopping.
+      }
+
+      setWakeListening(false)
+      setLastCommand('WAKE SIGNAL // HEY ADONIS')
+      setReply(wakeGreeting())
+      setStatus('SPEAKING')
+
+      speak(wakeGreeting(), () => {
+        setStatus('LISTENING')
+        startListening({ fromWake: true })
+      })
+    }
+
+    recognition.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        wakeEnabledRef.current = false
+        wakeRestartAllowedRef.current = false
+        setWakeEnabled(false)
+        setWakeListening(false)
+        setError('Microphone permission is required for the “Hey Adonis” wake phrase.')
+        return
+      }
+
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        setError('Wake listener: ' + event.error)
+      }
+    }
+
+    recognition.onend = () => {
+      wakeRecognitionRef.current = null
+      setWakeListening(false)
+
+      if (wakeEnabledRef.current && wakeRestartAllowedRef.current) {
+        window.setTimeout(() => startWakeRecognition(), 400)
+      }
+    }
+
+    try {
+      recognition.start()
+    } catch {
+      wakeRecognitionRef.current = null
+    }
+  }
+
+  function toggleWakeMode() {
+    if (wakeEnabledRef.current) {
+      wakeEnabledRef.current = false
+      wakeRestartAllowedRef.current = false
+      setWakeEnabled(false)
+      setWakeListening(false)
+      pauseWakeRecognition()
+      setReply('Wake phrase disabled.')
+      return
+    }
+
+    const SpeechRecognition = getSpeechRecognition()
+
+    if (!SpeechRecognition) {
+      setError('Wake phrase requires Chrome or Edge speech recognition support.')
+      return
+    }
+
+    wakeEnabledRef.current = true
+    setWakeEnabled(true)
+    setReply('Wake phrase armed. Say “Hey Adonis”.')
+    setLastCommand('VOICE WAKE // ARMED')
+    startWakeRecognition()
+  }
+
+  function startListening({ fromWake = false } = {}) {
+    const SpeechRecognition = getSpeechRecognition()
 
     if (!SpeechRecognition) {
       setError('Voice recognition is not supported by this browser.')
       return
     }
+
+    if (!fromWake) pauseWakeRecognition()
 
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-IN'
@@ -165,6 +332,7 @@ function App() {
       setListening(true)
       setStatus('LISTENING')
       setError('')
+      if (fromWake) setReply('ADONIS awake. Listening for your command...')
     }
 
     recognition.onresult = (event) => {
@@ -176,9 +344,12 @@ function App() {
     recognition.onerror = (event) => {
       setListening(false)
       setStatus('STANDBY')
+
       if (event.error !== 'no-speech') {
         setError('Microphone error: ' + event.error)
       }
+
+      resumeWakeRecognition()
     }
 
     recognition.onend = () => {
@@ -186,12 +357,14 @@ function App() {
       setStatus((current) =>
         current === 'LISTENING' ? 'STANDBY' : current,
       )
+
+      if (!command.trim()) resumeWakeRecognition()
     }
 
     recognition.start()
   }
 
-  function speak(text) {
+  function speak(text, onEnd) {
     if (!('speechSynthesis' in window)) {
       setStatus('READY')
       return
@@ -213,8 +386,14 @@ function App() {
     utterance.pitch = 0.78
     utterance.volume = 0.95
     utterance.onstart = () => setStatus('SPEAKING')
-    utterance.onend = () => setStatus('STANDBY')
-    utterance.onerror = () => setStatus('STANDBY')
+    utterance.onend = () => {
+      if (onEnd) onEnd()
+      else setStatus('STANDBY')
+    }
+    utterance.onerror = () => {
+      setStatus('STANDBY')
+      resumeWakeRecognition()
+    }
 
     window.speechSynthesis.speak(utterance)
   }
@@ -262,6 +441,7 @@ function App() {
     ['TOOL INTERFACE', aiOnline ? 'ONLINE' : 'STANDBY'],
     ['MEMORY CORE', chatHistory.length ? 'ONLINE' : 'SESSION'],
     ['SAFETY LAYER', 'ONLINE'],
+    ['WAKE WORD', wakeEnabled ? (wakeListening ? 'ARMED' : 'PAUSED') : 'OFF'],
   ]
 
   return (
@@ -445,7 +625,13 @@ function App() {
             <input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
-              placeholder={listening ? 'Listening...' : 'Ask anything...'}
+              placeholder={
+                listening
+                  ? 'Listening...'
+                  : wakeEnabled
+                    ? 'Say “Hey Adonis” or type a command...'
+                    : 'Ask anything...'
+              }
               disabled={status === 'PROCESSING'}
             />
           </div>
@@ -472,6 +658,19 @@ function App() {
               onClick={() => setVoiceEnabled((value) => !value)}
             >
               {voiceEnabled ? '◉' : '○'}
+            </button>
+            <button
+              type="button"
+              className={wakeEnabled ? 'mic-active' : ''}
+              title={
+                wakeEnabled
+                  ? 'Wake phrase armed: Hey Adonis'
+                  : 'Enable wake phrase: Hey Adonis'
+              }
+              onClick={toggleWakeMode}
+              aria-pressed={wakeEnabled}
+            >
+              ✦
             </button>
             <button
               type="button"
@@ -515,7 +714,7 @@ function App() {
       </div>
 
       <footer className="nexus-footer">
-        <span>ADONIS // BUILD 0.9</span>
+        <span>ADONIS // BUILD 1.0</span>
         <span>{googleStatus.connected ? 'GOOGLE LINKED' : 'GOOGLE OPTIONAL'}</span>
         <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
