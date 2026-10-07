@@ -458,7 +458,7 @@ function App() {
 
       <header className="nexus-header">
         <div className="brand-lockup">
-          <div className="brand-core"><span>N</span></div>
+          <div className="brand-core"><span>A</span></div>
           <div className="brand-copy">
             <strong>ADONIS</strong>
             <small>UNDERSTAND / REASON / ANTICIPATE</small>
@@ -558,7 +558,7 @@ function App() {
           </div>
 
           <div className="core-caption">
-            <span>NEURAL CORE // NX-01</span>
+            <span>NEURAL CORE // AD-01</span>
             <strong>{statusHeadline(status)}</strong>
             <small>
               {lastCommand || 'Drag to rotate / scroll to zoom / click to pulse'}
