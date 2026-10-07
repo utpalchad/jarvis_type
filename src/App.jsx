@@ -324,6 +324,8 @@ function App() {
     if (!fromWake) pauseWakeRecognition()
 
     const recognition = new SpeechRecognition()
+    let heardCommand = false
+
     recognition.lang = 'en-IN'
     recognition.interimResults = false
     recognition.continuous = false
@@ -337,8 +339,12 @@ function App() {
 
     recognition.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript || ''
-      setCommand(transcript)
-      if (transcript.trim()) sendCommand(transcript)
+
+      if (transcript.trim()) {
+        heardCommand = true
+        setCommand(transcript)
+        sendCommand(transcript)
+      }
     }
 
     recognition.onerror = (event) => {
@@ -358,7 +364,7 @@ function App() {
         current === 'LISTENING' ? 'STANDBY' : current,
       )
 
-      if (!command.trim()) resumeWakeRecognition()
+      if (!heardCommand) resumeWakeRecognition()
     }
 
     recognition.start()
