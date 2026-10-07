@@ -11,8 +11,6 @@ const activeModules = [
   ['VISION & MULTIMODAL', 72],
 ]
 
-const WAKE_PHRASE = 'hey adonis'
-
 const quickCommands = [
   ['REASON', 'Help me reason through this problem step by step.'],
   ['SEARCH', 'Search the web for the latest information about '],
@@ -26,10 +24,9 @@ function App() {
   const [booted, setBooted] = useState(false)
   const [command, setCommand] = useState('')
   const [lastCommand, setLastCommand] = useState('')
-  const [status, setStatus] = useState('STANDBY')
-  const [reply, setReply] = useState(
-    'I’m ready.\n\nI can analyze, create, reason, and execute complex tasks across multiple domains. How can I help you today?',
-  )
+  const [status, setStatus] = useState('LOCKED')
+  const [reply, setReply] = useState('Enter keyword to continue.')
+  const [unlocked, setUnlocked] = useState(false)
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
@@ -77,6 +74,10 @@ function App() {
 
   useEffect(() => {
     refreshHealth()
+    fetch('/api/lock', { method: 'POST' }).catch(() => {})
+    setUnlocked(false)
+    setStatus('LOCKED')
+    setReply('Enter keyword to continue.')
 
     const params = new URLSearchParams(window.location.search)
     if (params.get('google') === 'connected') {
@@ -105,6 +106,11 @@ function App() {
   async function sendCommand(text) {
     const clean = String(text || '').trim()
     if (!clean || status === 'PROCESSING') return
+
+    if (!unlocked) {
+      await attemptUnlock(clean)
+      return
+    }
 
     pauseWakeRecognition()
     window.speechSynthesis?.cancel()
@@ -150,7 +156,7 @@ function App() {
 
       if (voiceEnabled) {
         speak(data.reply, () => {
-          setStatus('STANDBY')
+          setStatus(unlocked ? 'STANDBY' : 'LOCKED')
           resumeWakeRecognition()
         })
       } else {
@@ -172,6 +178,63 @@ function App() {
     }
   }
 
+  async function attemptUnlock(text) {
+    const candidate = String(text || '').trim()
+    if (!candidate) return false
+
+    setCommand('')
+    setError('')
+    setStatus('PROCESSING')
+    setReply('Verifying access keyword...')
+
+    try {
+      const response = await fetch('/api/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: candidate }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.unlocked) {
+        setUnlocked(false)
+        setStatus('LOCKED')
+        setLastCommand('ACCESS DENIED')
+        setReply('Enter keyword to continue.')
+        return false
+      }
+
+      wakeEnabledRef.current = false
+      wakeRestartAllowedRef.current = false
+      try {
+        wakeRecognitionRef.current?.stop()
+      } catch {
+        // Listener may already be stopping.
+      }
+      wakeRecognitionRef.current = null
+      setWakeEnabled(false)
+      setWakeListening(false)
+      setUnlocked(true)
+      setLastCommand('ACCESS GRANTED // ADONIS')
+      setReply(wakeGreeting())
+
+      if (voiceEnabled) {
+        setStatus('SPEAKING')
+        speak(wakeGreeting(), () => setStatus('STANDBY'))
+      } else {
+        setStatus('READY')
+        window.setTimeout(() => setStatus('STANDBY'), 900)
+      }
+
+      return true
+    } catch {
+      setUnlocked(false)
+      setStatus('LOCKED')
+      setReply('Enter keyword to continue.')
+      return false
+    }
+  }
+
   function submitCommand(event) {
     event.preventDefault()
     sendCommand(command)
@@ -186,7 +249,7 @@ function App() {
     const period =
       hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
-    return period + '. ADONIS online. What can I do for you?'
+    return period + '. Access granted. ADONIS online. What can I do for you?'
   }
 
   function pauseWakeRecognition() {
@@ -212,7 +275,7 @@ function App() {
     if (!SpeechRecognition) {
       wakeEnabledRef.current = false
       setWakeEnabled(false)
-      setError('Wake phrase requires Chrome or Edge speech recognition support.')
+      setError('Voice access requires Chrome or Edge speech recognition support.')
       return
     }
 
@@ -236,7 +299,8 @@ function App() {
         transcript += ' ' + (event.results[index]?.[0]?.transcript || '')
       }
 
-      if (!transcript.toLowerCase().includes(WAKE_PHRASE)) return
+      const finalTranscript = transcript.trim()
+      if (!finalTranscript) return
 
       wakeRestartAllowedRef.current = false
 
@@ -247,13 +311,11 @@ function App() {
       }
 
       setWakeListening(false)
-      setLastCommand('WAKE SIGNAL // HEY ADONIS')
-      setReply(wakeGreeting())
-      setStatus('SPEAKING')
-
-      speak(wakeGreeting(), () => {
-        setStatus('LISTENING')
-        startListening({ fromWake: true })
+      attemptUnlock(finalTranscript).then((granted) => {
+        if (!granted && !unlocked) {
+          wakeRestartAllowedRef.current = true
+          resumeWakeRecognition()
+        }
       })
     }
 
@@ -263,12 +325,12 @@ function App() {
         wakeRestartAllowedRef.current = false
         setWakeEnabled(false)
         setWakeListening(false)
-        setError('Microphone permission is required for the “Hey Adonis” wake phrase.')
+        setError('Microphone permission is required for voice keyword access.')
         return
       }
 
       if (event.error !== 'no-speech' && event.error !== 'aborted') {
-        setError('Wake listener: ' + event.error)
+        setError('Access listener: ' + event.error)
       }
     }
 
@@ -289,28 +351,63 @@ function App() {
   }
 
   function toggleWakeMode() {
+    if (unlocked) {
+      lockAdonis()
+      return
+    }
+
     if (wakeEnabledRef.current) {
       wakeEnabledRef.current = false
       wakeRestartAllowedRef.current = false
       setWakeEnabled(false)
       setWakeListening(false)
       pauseWakeRecognition()
-      setReply('Wake phrase disabled.')
+      setReply('Enter keyword to continue.')
+      setStatus('LOCKED')
       return
     }
 
     const SpeechRecognition = getSpeechRecognition()
 
     if (!SpeechRecognition) {
-      setError('Wake phrase requires Chrome or Edge speech recognition support.')
+      setError('Voice access requires Chrome or Edge speech recognition support.')
       return
     }
 
     wakeEnabledRef.current = true
     setWakeEnabled(true)
-    setReply('Wake phrase armed. Say “Hey Adonis”.')
-    setLastCommand('VOICE WAKE // ARMED')
+    setReply('Enter keyword to continue.')
+    setLastCommand('VOICE ACCESS // ARMED')
+    setStatus('LOCKED')
     startWakeRecognition()
+  }
+
+  async function lockAdonis() {
+    wakeEnabledRef.current = false
+    wakeRestartAllowedRef.current = false
+    pauseWakeRecognition()
+    window.speechSynthesis?.cancel()
+
+    try {
+      await fetch('/api/lock', { method: 'POST' })
+    } catch {
+      // Client lock still applies if the request fails.
+    }
+
+    setUnlocked(false)
+    setWakeEnabled(false)
+    setWakeListening(false)
+    setCommand('')
+    setChatHistory([])
+    setInteractionId(null)
+    setLastLatency(null)
+    setHud(null)
+    setActions([])
+    setToolLog([])
+    setError('')
+    setLastCommand('ACCESS LOCKED')
+    setReply('Enter keyword to continue.')
+    setStatus('LOCKED')
   }
 
   function startListening({ fromWake = false } = {}) {
@@ -334,7 +431,7 @@ function App() {
       setListening(true)
       setStatus('LISTENING')
       setError('')
-      if (fromWake) setReply('ADONIS awake. Listening for your command...')
+      if (fromWake) setReply(unlocked ? 'ADONIS awake. Listening for your command...' : 'Enter keyword to continue.')
     }
 
     recognition.onresult = (event) => {
@@ -429,7 +526,7 @@ function App() {
     setInteractionId(null)
     setChatHistory([])
     setLastLatency(null)
-    setReply('Session reset. Neural core standing by.')
+    setReply(unlocked ? 'Session reset. Neural core standing by.' : 'Enter keyword to continue.')
     setLastCommand('')
     setHud(null)
     setActions([])
@@ -447,7 +544,8 @@ function App() {
     ['TOOL INTERFACE', aiOnline ? 'ONLINE' : 'STANDBY'],
     ['MEMORY CORE', chatHistory.length ? 'ONLINE' : 'SESSION'],
     ['SAFETY LAYER', 'ONLINE'],
-    ['WAKE WORD', wakeEnabled ? (wakeListening ? 'ARMED' : 'PAUSED') : 'OFF'],
+    ['ACCESS GATE', unlocked ? 'UNLOCKED' : 'LOCKED'],
+    ['VOICE ACCESS', wakeEnabled ? (wakeListening ? 'ARMED' : 'PAUSED') : 'OFF'],
   ]
 
   return (
@@ -484,7 +582,7 @@ function App() {
 
       <section className="control-room">
         <aside className="left-console">
-          <HudPanel compact title="AI ASSISTANT" status={aiOnline ? 'ONLINE' : 'STANDBY'}>
+          <HudPanel compact title="AI ASSISTANT" status={unlocked ? (aiOnline ? 'ONLINE' : 'STANDBY') : 'LOCKED'}>
             <div className="assistant-wave">
               <MiniSignal status={status} compact />
             </div>
@@ -631,12 +729,14 @@ function App() {
             <input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
+              type={unlocked ? 'text' : 'password'}
+              autoComplete="off"
               placeholder={
                 listening
                   ? 'Listening...'
-                  : wakeEnabled
-                    ? 'Say “Hey Adonis” or type a command...'
-                    : 'Ask anything...'
+                  : unlocked
+                    ? 'Ask anything...'
+                    : 'Enter keyword to continue...'
               }
               disabled={status === 'PROCESSING'}
             />
@@ -669,9 +769,11 @@ function App() {
               type="button"
               className={wakeEnabled ? 'mic-active' : ''}
               title={
-                wakeEnabled
-                  ? 'Wake phrase armed: Hey Adonis'
-                  : 'Enable wake phrase: Hey Adonis'
+                unlocked
+                  ? 'Lock ADONIS'
+                  : wakeEnabled
+                    ? 'Voice keyword listener armed'
+                    : 'Enable voice keyword listener'
               }
               onClick={toggleWakeMode}
               aria-pressed={wakeEnabled}
@@ -720,7 +822,7 @@ function App() {
       </div>
 
       <footer className="nexus-footer">
-        <span>ADONIS // BUILD 1.0</span>
+        <span>ADONIS // BUILD 1.1</span>
         <span>{googleStatus.connected ? 'GOOGLE LINKED' : 'GOOGLE OPTIONAL'}</span>
         <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
@@ -846,6 +948,7 @@ function responseLatencyLabel(status, latencyMs) {
 }
 
 function statusHeadline(status) {
+  if (status === 'LOCKED') return 'Access locked.'
   if (status === 'LISTENING') return 'Listening.'
   if (status === 'PROCESSING') return 'Reasoning.'
   if (status === 'SPEAKING') return 'Responding.'
