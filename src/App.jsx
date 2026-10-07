@@ -1,50 +1,75 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import CoreScene from './components/CoreScene.jsx'
+import ContextHud from './components/ContextHud.jsx'
+import VoiceWaveform from './components/VoiceWaveform.jsx'
 
-const diagnostics = [
-  ['CORE LOAD', '18%', 'nominal'],
-  ['MEMORY', '42%', 'stable'],
-  ['NETWORK', '8 ms', 'secure'],
-  ['UPTIME', '99.9%', 'online'],
-]
-
-const tasks = [
-  { time: '18:00', title: 'Review project architecture', meta: 'Development' },
-  { time: '19:30', title: 'AI core integration', meta: 'Research' },
-  { time: '21:00', title: 'Interface calibration', meta: 'System' },
+const quickCommands = [
+  ['WEATHER', 'What is the weather in Noida today?'],
+  ['SCHEDULE', 'What is on my schedule?'],
+  ['EMAIL', 'Summarize my unread emails.'],
+  ['SEARCH', 'Search the web for the latest Gemini API documentation.'],
 ]
 
 function App() {
   const [booted, setBooted] = useState(false)
   const [command, setCommand] = useState('')
+  const [lastCommand, setLastCommand] = useState('')
   const [status, setStatus] = useState('STANDBY')
-  const [reply, setReply] = useState('AI core initialized. Awaiting your directive.')
+  const [reply, setReply] = useState('Neural interface ready. Awaiting directive.')
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [aiOnline, setAiOnline] = useState(false)
   const [interactionId, setInteractionId] = useState(null)
-  const recognitionRef = useRef(null)
+  const [hud, setHud] = useState(null)
+  const [actions, setActions] = useState([])
+  const [toolLog, setToolLog] = useState([])
+  const [googleStatus, setGoogleStatus] = useState({
+    configured: false,
+    connected: false,
+  })
+
+  const clock = useClock()
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setBooted(true), 2300)
+    const timer = window.setTimeout(() => setBooted(true), 2200)
     return () => window.clearTimeout(timer)
   }, [])
 
   useEffect(() => {
-    fetch('/api/health')
-      .then((response) => response.json())
-      .then((data) => setAiOnline(Boolean(data.aiConfigured)))
-      .catch(() => setAiOnline(false))
+    refreshHealth()
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('google') === 'connected') {
+      setReply('Google Calendar and Gmail link established.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
   }, [])
 
-  const clock = useClock()
+  async function refreshHealth() {
+    try {
+      const response = await fetch('/api/health')
+      const data = await response.json()
+      setAiOnline(Boolean(data.aiConfigured))
+      setGoogleStatus(
+        data.integrations?.google || { configured: false, connected: false },
+      )
+    } catch {
+      setAiOnline(false)
+    }
+  }
 
   async function sendCommand(text) {
     const clean = String(text || '').trim()
     if (!clean || status === 'PROCESSING') return
 
+    window.speechSynthesis?.cancel()
     setCommand('')
+    setLastCommand(clean)
     setError('')
+    setHud(null)
+    setActions([])
+    setToolLog([])
     setStatus('PROCESSING')
     setReply('Analyzing directive...')
 
@@ -66,17 +91,24 @@ function App() {
 
       setReply(data.reply)
       setInteractionId(data.interactionId || null)
+      setHud(data.hud || null)
+      setActions(data.actions || [])
+      setToolLog(data.toolLog || [])
       setAiOnline(true)
-      setStatus('READY')
 
-      if (voiceEnabled) speak(data.reply)
+      if (voiceEnabled) {
+        speak(data.reply)
+      } else {
+        setStatus('READY')
+        window.setTimeout(() => setStatus('STANDBY'), 1800)
+      }
 
-      window.setTimeout(() => setStatus('STANDBY'), 2200)
+      refreshHealth()
     } catch (requestError) {
       setStatus('ERROR')
       setError(requestError.message)
       setReply('AI link unavailable.')
-      window.setTimeout(() => setStatus('STANDBY'), 3000)
+      window.setTimeout(() => setStatus('STANDBY'), 3200)
     }
   }
 
@@ -86,68 +118,111 @@ function App() {
   }
 
   function startListening() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition
 
     if (!SpeechRecognition) {
-      setError('Voice recognition is not supported by this browser. Use Chrome or type your command.')
+      setError(
+        'Voice recognition is not supported by this browser. Use Chrome or type your command.',
+      )
       return
     }
 
-    if (!recognitionRef.current) {
-      const recognition = new SpeechRecognition()
-      recognition.lang = 'en-IN'
-      recognition.interimResults = false
-      recognition.continuous = false
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'en-IN'
+    recognition.interimResults = false
+    recognition.continuous = false
 
-      recognition.onstart = () => {
-        setListening(true)
-        setStatus('LISTENING')
-        setError('')
-      }
-
-      recognition.onresult = (event) => {
-        const transcript = event.results?.[0]?.[0]?.transcript || ''
-        setCommand(transcript)
-        if (transcript.trim()) sendCommand(transcript)
-      }
-
-      recognition.onerror = (event) => {
-        setListening(false)
-        setStatus('STANDBY')
-        if (event.error !== 'no-speech') {
-          setError('Microphone error: ' + event.error)
-        }
-      }
-
-      recognition.onend = () => {
-        setListening(false)
-        setStatus((current) => current === 'LISTENING' ? 'STANDBY' : current)
-      }
-
-      recognitionRef.current = recognition
+    recognition.onstart = () => {
+      setListening(true)
+      setStatus('LISTENING')
+      setError('')
     }
 
-    recognitionRef.current.start()
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || ''
+      setCommand(transcript)
+      if (transcript.trim()) sendCommand(transcript)
+    }
+
+    recognition.onerror = (event) => {
+      setListening(false)
+      setStatus('STANDBY')
+      if (event.error !== 'no-speech') {
+        setError('Microphone error: ' + event.error)
+      }
+    }
+
+    recognition.onend = () => {
+      setListening(false)
+      setStatus((current) =>
+        current === 'LISTENING' ? 'STANDBY' : current,
+      )
+    }
+
+    recognition.start()
   }
 
   function speak(text) {
-    if (!('speechSynthesis' in window)) return
+    if (!('speechSynthesis' in window)) {
+      setStatus('READY')
+      return
+    }
+
     window.speechSynthesis.cancel()
 
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 1
-    utterance.pitch = 0.88
-    utterance.volume = 0.92
+    const voices = window.speechSynthesis.getVoices()
+    const preferred =
+      voices.find(
+        (voice) =>
+          /en(-|_)GB/i.test(voice.lang) && /male|daniel|george/i.test(voice.name),
+      ) || voices.find((voice) => /en(-|_)GB/i.test(voice.lang))
+
+    if (preferred) utterance.voice = preferred
+
+    utterance.rate = 0.96
+    utterance.pitch = 0.82
+    utterance.volume = 0.94
 
     utterance.onstart = () => setStatus('SPEAKING')
     utterance.onend = () => setStatus('STANDBY')
+    utterance.onerror = () => setStatus('STANDBY')
 
     window.speechSynthesis.speak(utterance)
+  }
+
+  function openAction(action) {
+    if (action?.type !== 'open_url' || !action.url) return
+    window.open(action.url, '_blank', 'noopener,noreferrer')
+  }
+
+  async function connectGoogle() {
+    try {
+      setError('')
+      const response = await fetch('/api/google/auth-url')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            'Google OAuth is not configured in the server environment.',
+        )
+      }
+
+      window.location.assign(data.url)
+    } catch (connectError) {
+      setError(connectError.message)
+    }
   }
 
   function resetConversation() {
     setInteractionId(null)
     setReply('Conversation memory cleared. Awaiting directive.')
+    setLastCommand('')
+    setHud(null)
+    setActions([])
+    setToolLog([])
     setError('')
     window.speechSynthesis?.cancel()
     setStatus('STANDBY')
@@ -155,196 +230,251 @@ function App() {
 
   if (!booted) return <BootSequence />
 
-  return (
-    <main className="shell">
-      <div className="noise" />
-      <div className="scanline" />
+  const voiceActive =
+    listening || status === 'SPEAKING' || status === 'PROCESSING'
 
-      <header className="topbar hud-frame">
-        <div className="brand">
-          <span className="brand-mark">J</span>
+  return (
+    <main className="jarvis-shell">
+      <div className="ambient-grid" />
+      <div className="scan-sweep" />
+      <div className="screen-vignette" />
+
+      <header className="command-header">
+        <div className="identity">
+          <span className="identity-glyph">J</span>
           <div>
             <strong>J.A.R.V.I.S</strong>
-            <small>JUST A RATHER VERY INTELLIGENT SYSTEM</small>
+            <small>NEURAL COMMAND INTERFACE</small>
           </div>
         </div>
 
-        <div className="top-status">
-          <span className={'status-dot ' + (aiOnline ? '' : 'status-dot-warn')} />
-          <span>{aiOnline ? 'AI LINK ONLINE' : 'AI LINK STANDBY'}</span>
-          <span className="divider" />
-          <span>{clock}</span>
+        <div className="header-center">
+          <span className={aiOnline ? 'link-live' : 'link-warn'} />
+          {aiOnline ? 'AI CORE LINKED' : 'AI CORE UNPAIRED'}
+        </div>
+
+        <div className="clock-block">
+          <small>LOCAL TIME</small>
+          <strong>{clock}</strong>
         </div>
       </header>
 
-      <section className="workspace">
-        <aside className="left-rail">
-          <Panel eyebrow="DIAGNOSTICS" title="System integrity">
-            <div className="diag-grid">
-              {diagnostics.map(([label, value, meta]) => (
-                <div className="diag" key={label}>
-                  <div className="diag-ring"><span>{value}</span></div>
-                  <div>
-                    <strong>{label}</strong>
-                    <small>{meta}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <SignalGraph />
-          </Panel>
-
-          <Panel eyebrow="SECURITY" title="Network perimeter">
-            <div className="security-row">
-              <span className="security-icon">⌁</span>
-              <div>
-                <strong>PRIVATE AI CHANNEL</strong>
-                <small>API key remains server-side</small>
-              </div>
-            </div>
-            <div className="micro-grid">
-              <span>INTERFACE</span><span className="ok">ACTIVE</span>
-              <span>VOICE</span><span className="ok">LOCAL</span>
-              <span>GEMINI</span><span className={aiOnline ? 'ok' : ''}>{aiOnline ? 'ONLINE' : 'STANDBY'}</span>
-            </div>
-          </Panel>
+      <section className="interface-stage">
+        <aside className="telemetry-rail telemetry-left">
+          <Telemetry label="RENDER" value="WEBGL" live />
+          <Telemetry
+            label="VOICE"
+            value={voiceEnabled ? 'ARMED' : 'MUTED'}
+            live={voiceEnabled}
+          />
+          <Telemetry
+            label="GEMINI"
+            value={aiOnline ? 'LINKED' : 'STANDBY'}
+            live={aiOnline}
+          />
+          <Telemetry
+            label="GOOGLE"
+            value={googleStatus.connected ? 'PAIRED' : 'UNPAIRED'}
+            live={googleStatus.connected}
+          />
         </aside>
 
-        <section className="core-zone">
-          <div className="core-label core-label-left">
-            <small>INTERFACE MODE</small>
-            <strong>COMMAND</strong>
-          </div>
+        <section className="core-stage">
+          <div className="radial-scale radial-scale-one" />
+          <div className="radial-scale radial-scale-two" />
 
-          <div className="core-label core-label-right">
-            <small>AI CORE</small>
+          <div className="core-status-label core-status-left">
+            <span>STATE</span>
             <strong>{status}</strong>
           </div>
 
-          <div className={'reactor ' + status.toLowerCase()}>
-            <div className="orbit orbit-a"><i /><i /><i /></div>
-            <div className="orbit orbit-b"><i /><i /></div>
-            <div className="orbit orbit-c" />
-            <div className="reticle reticle-one" />
-            <div className="reticle reticle-two" />
-            <div className="core-halo" />
-            <div className="core-sphere">
-              <div className="core-grid" />
-              <div className="core-light" />
-              <span className="core-glyph">J</span>
+          <div className="core-status-label core-status-right">
+            <span>MODEL</span>
+            <strong>GEMINI 3.8 FLASH</strong>
+          </div>
+
+          <CoreScene status={status} />
+
+          <div className="core-readout">
+            <small>NEURAL CORE // 01</small>
+            <h1>{statusHeadline(status)}</h1>
+            <p>
+              {lastCommand
+                ? 'DIRECTIVE: ' + lastCommand
+                : 'Voice and text channels ready.'}
+            </p>
+          </div>
+
+          <VoiceWaveform
+            active={voiceActive}
+            mode={
+              status === 'LISTENING'
+                ? 'LISTENING'
+                : status === 'SPEAKING'
+                  ? 'VOICE OUTPUT'
+                  : status === 'PROCESSING'
+                    ? 'NEURAL PROCESS'
+                    : 'STANDBY'
+            }
+          />
+        </section>
+
+        <aside className="telemetry-rail telemetry-right">
+          <div className="trace-title">TOOL TRACE</div>
+          {toolLog.length ? (
+            toolLog.map((tool, index) => (
+              <div className="trace-row" key={tool.name + index}>
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <strong>{tool.name.replaceAll('_', ' ').toUpperCase()}</strong>
+                <i className={tool.status === 'complete' ? 'trace-ok' : ''}>
+                  {tool.status}
+                </i>
+              </div>
+            ))
+          ) : (
+            <div className="trace-empty">
+              Context modules deploy when required.
             </div>
-            <div className="axis axis-x" />
-            <div className="axis axis-y" />
-          </div>
+          )}
+        </aside>
 
-          <div className="core-copy">
-            <p>NEURAL INTERFACE</p>
-            <h1>{status === 'LISTENING' ? 'Listening.' : status === 'PROCESSING' ? 'Thinking.' : status === 'SPEAKING' ? 'Responding.' : 'Awaiting directive.'}</h1>
-            <span>Gemini 3.7 Flash // voice interface // secure backend</span>
-          </div>
+        <ContextHud
+          hud={hud}
+          actions={actions}
+          onAction={openAction}
+          onGoogleConnect={connectGoogle}
+        />
+      </section>
 
-          <div className={'response-console ' + (error ? 'response-error' : '')}>
-            <div className="response-head">
-              <span>JARVIS RESPONSE</span>
-              <span>{status}</span>
-            </div>
-            <p>{error || reply}</p>
-          </div>
+      <section className={'neural-response ' + (error ? 'neural-error' : '')}>
+        <div className="response-meta">
+          <span>NEURAL RESPONSE // {interactionId ? interactionId.slice(-6).toUpperCase() : 'LOCAL'}</span>
+          <span>{error ? 'FAULT' : status}</span>
+        </div>
+        <Typewriter text={error || reply} />
+      </section>
 
-          <form className="command-bar" onSubmit={submitCommand}>
-            <button
-              type="button"
-              className={'mic-btn ' + (listening ? 'mic-listening' : '')}
-              aria-label="Voice input"
-              onClick={startListening}
-              title="Voice input"
-            >
-              <span>◉</span>
-            </button>
+      <section className="command-zone">
+        <form className="command-dock" onSubmit={submitCommand}>
+          <button
+            type="button"
+            className={'voice-trigger ' + (listening ? 'voice-trigger-live' : '')}
+            onClick={startListening}
+            aria-label="Start voice input"
+          >
+            <span />
+            <i>MIC</i>
+          </button>
 
+          <div className="command-field">
+            <small>DIRECTIVE INPUT</small>
             <input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
-              placeholder={listening ? 'Listening...' : 'Enter a command...'}
-              aria-label="Command input"
+              placeholder={listening ? 'Listening...' : 'Speak or enter a command'}
               disabled={status === 'PROCESSING'}
             />
-
-            <kbd>ENTER</kbd>
-            <button className="send-btn" type="submit" aria-label="Send command" disabled={status === 'PROCESSING'}>↗</button>
-          </form>
-
-          <div className="quick-actions">
-            <button onClick={() => sendCommand('Introduce yourself briefly.')}>INTRO</button>
-            <button onClick={() => sendCommand('Help me plan what I should work on today.')}>PLAN</button>
-            <button onClick={() => setVoiceEnabled((value) => !value)}>{voiceEnabled ? 'VOICE ON' : 'VOICE OFF'}</button>
-            <button onClick={resetConversation}>NEW SESSION</button>
           </div>
-        </section>
 
-        <aside className="right-rail">
-          <Panel eyebrow="ENVIRONMENT" title="Local telemetry">
-            <div className="environment">
-              <div className="temperature">--°</div>
-              <div>
-                <strong>WEATHER LINK</strong>
-                <small>Tool not connected yet</small>
-              </div>
-              <div className="radar"><span /><i /></div>
-            </div>
-          </Panel>
+          <button
+            className="execute-command"
+            type="submit"
+            disabled={status === 'PROCESSING'}
+          >
+            EXECUTE <span>↗</span>
+          </button>
+        </form>
 
-          <Panel eyebrow="AGENDA" title="Operations queue">
-            <div className="timeline">
-              {tasks.map((task) => (
-                <div className="timeline-item" key={task.time}>
-                  <time>{task.time}</time>
-                  <span className="timeline-node" />
-                  <div>
-                    <strong>{task.title}</strong>
-                    <small>{task.meta}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel eyebrow="AI STATUS" title="Core services">
-            <div className="service-list">
-              <Service label="Interface" active />
-              <Service label="Voice input" active />
-              <Service label="Voice output" active={voiceEnabled} />
-              <Service label="Gemini" active={aiOnline} />
-              <Service label="Tool routing" />
-            </div>
-          </Panel>
-        </aside>
+        <div className="command-shortcuts">
+          {quickCommands.map(([label, prompt]) => (
+            <button key={label} onClick={() => sendCommand(prompt)}>
+              {label}
+            </button>
+          ))}
+          <button onClick={() => setVoiceEnabled((value) => !value)}>
+            {voiceEnabled ? 'VOICE: ON' : 'VOICE: OFF'}
+          </button>
+          {!googleStatus.connected && (
+            <button onClick={connectGoogle}>LINK GOOGLE</button>
+          )}
+          <button onClick={resetConversation}>NEW SESSION</button>
+        </div>
       </section>
 
-      <footer className="footer-strip">
-        <span>JARVIS // PROTOTYPE 0.2</span>
-        <span>GEMINI 3.7 FLASH</span>
-        <span>{aiOnline ? 'AI CORE CONNECTED' : 'ADD API KEY TO ACTIVATE AI'}</span>
+      <footer className="system-footer">
+        <span>JARVIS // BUILD 0.6</span>
+        <span>CONTEXTUAL HUD ACTIVE</span>
+        <span>THREE.JS CORE</span>
+        <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
     </main>
   )
 }
 
+function statusHeadline(status) {
+  if (status === 'LISTENING') return 'Listening.'
+  if (status === 'PROCESSING') return 'Analyzing.'
+  if (status === 'SPEAKING') return 'Responding.'
+  if (status === 'READY') return 'Directive complete.'
+  if (status === 'ERROR') return 'Link fault.'
+  return 'Awaiting directive.'
+}
+
+function Telemetry({ label, value, live = false }) {
+  return (
+    <div className="telemetry-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <i className={live ? 'telemetry-live' : ''} />
+    </div>
+  )
+}
+
+function Typewriter({ text }) {
+  const [visible, setVisible] = useState(text)
+
+  useEffect(() => {
+    const value = String(text || '')
+    if (value.length > 900) {
+      setVisible(value)
+      return undefined
+    }
+
+    setVisible('')
+    let index = 0
+    const step = Math.max(1, Math.ceil(value.length / 110))
+
+    const timer = window.setInterval(() => {
+      index = Math.min(value.length, index + step)
+      setVisible(value.slice(0, index))
+      if (index >= value.length) window.clearInterval(timer)
+    }, 14)
+
+    return () => window.clearInterval(timer)
+  }, [text])
+
+  return <p>{visible}<span className="typing-cursor" /></p>
+}
+
 function useClock() {
   const formatter = useMemo(
-    () => new Intl.DateTimeFormat('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }),
+    () =>
+      new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }),
     [],
   )
 
   const [time, setTime] = useState(formatter.format(new Date()))
 
   useEffect(() => {
-    const id = window.setInterval(() => setTime(formatter.format(new Date())), 1000)
+    const id = window.setInterval(
+      () => setTime(formatter.format(new Date())),
+      1000,
+    )
     return () => window.clearInterval(id)
   }, [formatter])
 
@@ -353,52 +483,21 @@ function useClock() {
 
 function BootSequence() {
   return (
-    <main className="boot-screen">
-      <div className="boot-reticle"><span /><i /></div>
-      <p>J.A.R.V.I.S // INITIALIZATION</p>
-      <div className="boot-lines">
-        <span>CORE INTERFACE ........ OK</span>
-        <span>VOICE SUBSYSTEM ....... OK</span>
-        <span>SECURE CHANNEL ........ OK</span>
-        <span>AI SERVICES ........... CHECKING</span>
+    <main className="boot-sequence">
+      <div className="boot-core">
+        <span />
+        <i />
+        <b />
       </div>
-      <div className="boot-progress"><i /></div>
+      <small>J.A.R.V.I.S // COLD START</small>
+      <div className="boot-log">
+        <span>RENDER ENGINE ............... ONLINE</span>
+        <span>VOICE SUBSYSTEM .............. ONLINE</span>
+        <span>NEURAL ROUTER ................ ONLINE</span>
+        <span>EXTERNAL TOOLS ............... ARMED</span>
+      </div>
+      <div className="boot-track"><i /></div>
     </main>
-  )
-}
-
-function Panel({ eyebrow, title, children }) {
-  return (
-    <section className="panel hud-frame">
-      <div className="panel-heading">
-        <div>
-          <span>{eyebrow}</span>
-          <h2>{title}</h2>
-        </div>
-        <b>+</b>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function SignalGraph() {
-  return (
-    <div className="signal">
-      <div className="signal-grid" />
-      <svg viewBox="0 0 300 72" preserveAspectRatio="none" role="img" aria-label="System signal graph">
-        <polyline points="0,54 20,50 35,54 53,30 70,43 86,22 102,48 120,41 137,50 157,18 176,38 193,34 208,49 228,28 245,44 263,35 280,39 300,16" />
-      </svg>
-    </div>
-  )
-}
-
-function Service({ label, active = false }) {
-  return (
-    <div className="service">
-      <span>{label}</span>
-      <span className={active ? 'service-active' : ''}>{active ? 'ONLINE' : 'STANDBY'}</span>
-    </div>
   )
 }
 
