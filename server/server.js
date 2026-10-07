@@ -106,6 +106,26 @@ const systemInstruction = [
 
 app.use(express.json({ limit: '32kb' }))
 
+function normalizeMemories(memories) {
+  if (!Array.isArray(memories)) return []
+
+  return memories
+    .slice(-30)
+    .map((item) => String(item || '').trim().slice(0, 500))
+    .filter(Boolean)
+}
+
+function memoryInstruction(memories) {
+  const saved = normalizeMemories(memories)
+  if (!saved.length) return ''
+
+  return [
+    'USER-APPROVED LONG-TERM MEMORIES:',
+    ...saved.map((memory, index) => String(index + 1) + '. ' + memory),
+    'Use these memories only when relevant. Do not invent additional memories.',
+  ].join('\n')
+}
+
 function normalizeHistory(history) {
   if (!Array.isArray(history)) return []
 
@@ -240,7 +260,13 @@ app.get('/api/google/callback', async (req, res) => {
   }
 })
 
-async function runFastResponse(ai, message, history, advanced = false) {
+async function runFastResponse(
+  ai,
+  message,
+  history,
+  memories,
+  advanced = false,
+) {
   const contents = [
     ...normalizeHistory(history),
     {
@@ -253,7 +279,9 @@ async function runFastResponse(ai, message, history, advanced = false) {
     model: advanced ? advancedModel : fastModel,
     contents,
     config: {
-      systemInstruction,
+      systemInstruction: [systemInstruction, memoryInstruction(memories)]
+        .filter(Boolean)
+        .join('\n\n'),
       thinkingConfig: {
         thinkingLevel: advanced ? 'low' : 'minimal',
       },
@@ -271,7 +299,7 @@ async function runFastResponse(ai, message, history, advanced = false) {
   }
 }
 
-async function runToolResponse(ai, message, history) {
+async function runToolResponse(ai, message, history, memories) {
   const historyText = normalizeHistory(history)
     .map((item) => {
       const label = item.role === 'model' ? 'ADONIS' : 'USER'
@@ -281,6 +309,7 @@ async function runToolResponse(ai, message, history) {
 
   const input = [
     systemInstruction,
+    memoryInstruction(memories),
     'Use available tools when the request requires current data or an external action.',
     'Browser actions are prepared for visible user activation.',
     'Use run_local_action only for explicitly requested allow-listed harmless desktop actions.',
@@ -388,6 +417,7 @@ app.post('/api/chat', async (req, res) => {
 
   const message = String(req.body?.message || '').trim()
   const history = req.body?.history
+  const memories = normalizeMemories(req.body?.memories)
 
   if (!message) {
     return res.status(400).json({ error: 'Command is required.' })
@@ -415,12 +445,13 @@ app.post('/api/chat', async (req, res) => {
     let result
 
     if (needsTools(message)) {
-      result = await runToolResponse(ai, message, history)
+      result = await runToolResponse(ai, message, history, memories)
     } else {
       result = await runFastResponse(
         ai,
         message,
         history,
+        memories,
         needsAdvancedReasoning(message),
       )
     }
