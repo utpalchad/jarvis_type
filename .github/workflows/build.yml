@@ -29,6 +29,7 @@ jobs:
           node --check server/server.js
           node --check server/tools.js
           node --check server/google.js
+          node --check server/localAgent.js
 
       - name: Build frontend
         run: npm run build
