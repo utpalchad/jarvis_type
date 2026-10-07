@@ -1,14 +1,14 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { google } from 'googleapis'
+import { randomBytes } from 'node:crypto'\nimport { google } from 'googleapis'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const tokenDir = path.resolve(__dirname, '../.jarvis')
 const tokenFile = path.join(tokenDir, 'google-tokens.json')
 
-const scopes = [
+const pendingStates = new Set()\n\nconst scopes = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/gmail.readonly',
 ]
@@ -58,11 +58,22 @@ export async function getGoogleAuthUrl() {
     throw new Error('Google OAuth is not configured.')
   }
 
+  const state = randomBytes(24).toString('hex')
+  pendingStates.add(state)
+
   return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
+    include_granted_scopes: true,
     scope: scopes,
+    state,
   })
+}
+
+export function consumeGoogleOAuthState(state) {
+  if (!state || !pendingStates.has(state)) return false
+  pendingStates.delete(state)
+  return true
 }
 
 export async function finishGoogleOAuth(code) {
