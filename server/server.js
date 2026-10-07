@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { GoogleGenAI } from '@google/genai'
 import {
+  consumeGoogleOAuthState,
   finishGoogleOAuth,
   getGoogleAuthUrl,
   getGoogleStatus,
@@ -38,14 +39,20 @@ app.get('/api/google/auth-url', async (_req, res) => {
 
 app.get('/api/google/callback', async (req, res) => {
   const code = String(req.query.code || '')
+  const state = String(req.query.state || '')
 
   if (!code) {
     return res.status(400).send('Missing Google authorization code.')
   }
 
+  if (!consumeGoogleOAuthState(state)) {
+    return res.status(400).send('Invalid or expired Google authorization state.')
+  }
+
   try {
     await finishGoogleOAuth(code)
-    res.redirect('/?google=connected')
+    const appUrl = process.env.APP_URL || 'http://localhost:5173'
+    res.redirect(appUrl + '/?google=connected')
   } catch (error) {
     console.error('Google OAuth callback failed:', error)
     res.status(500).send('Google connection failed. Check the server terminal.')
