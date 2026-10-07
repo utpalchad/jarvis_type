@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import path from 'node:path'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { GoogleGenAI } from '@google/genai'
 import {
@@ -21,6 +22,80 @@ const port = process.env.PORT || 3001
 
 const fastModel = 'gemini-3.5-flash-lite'
 const advancedModel = 'gemini-3.8-flash'
+const accessKey = String(process.env.ADONIS_ACCESS_KEY || '').trim()
+
+function normalizeAccessKey(value) {
+  return String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+}
+
+function digestAccessValue(value) {
+  return createHmac('sha256', accessKey || 'adonis-unconfigured')
+    .update(String(value))
+    .digest()
+}
+
+function matchesAccessKey(candidate) {
+  if (!accessKey) return false
+
+  const expected = digestAccessValue(normalizeAccessKey(accessKey))
+  const actual = digestAccessValue(normalizeAccessKey(candidate))
+
+  return timingSafeEqual(expected, actual)
+}
+
+function accessToken() {
+  return createHmac('sha256', accessKey)
+    .update('adonis-access-session-v1')
+    .digest('hex')
+}
+
+function readCookie(req, name) {
+  const cookies = String(req.headers.cookie || '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  for (const cookie of cookies) {
+    const separator = cookie.indexOf('=')
+    if (separator === -1) continue
+    if (cookie.slice(0, separator) === name) {
+      return decodeURIComponent(cookie.slice(separator + 1))
+    }
+  }
+
+  return ''
+}
+
+function hasAccess(req) {
+  if (!accessKey) return false
+
+  const cookie = readCookie(req, 'adonis_access')
+  if (!cookie) return false
+
+  const expected = Buffer.from(accessToken())
+  const actual = Buffer.from(cookie)
+
+  return (
+    expected.length === actual.length &&
+    timingSafeEqual(expected, actual)
+  )
+}
+
+function accessCookieOptions(req) {
+  const secure =
+    req.secure || String(req.headers['x-forwarded-proto'] || '') === 'https'
+
+  return [
+    'HttpOnly',
+    'SameSite=Lax',
+    'Path=/',
+    secure ? 'Secure' : '',
+  ]
+    .filter(Boolean)
+    .join('; ')
+}
 
 const systemInstruction = [
   'You are ADONIS, a concise, calm, capable personal AI assistant.',
@@ -69,6 +144,8 @@ app.get('/api/health', async (_req, res) => {
     aiConfigured: Boolean(
       process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
     ),
+    accessConfigured: Boolean(accessKey),
+    unlocked: hasAccess(_req),
     models: {
       fast: fastModel,
       advanced: advancedModel,
@@ -79,6 +156,57 @@ app.get('/api/health', async (_req, res) => {
       localAgent,
     },
   })
+})
+
+app.get('/api/access-status', (req, res) => {
+  res.json({
+    configured: Boolean(accessKey),
+    unlocked: hasAccess(req),
+  })
+})
+
+app.post('/api/unlock', (req, res) => {
+  if (!accessKey) {
+    return res.status(503).json({
+      unlocked: false,
+      error: 'ADONIS access keyword is not configured.',
+    })
+  }
+
+  const keyword = String(req.body?.keyword || '')
+
+  if (!matchesAccessKey(keyword)) {
+    return res.status(401).json({
+      unlocked: false,
+      message: 'Enter keyword to continue.',
+    })
+  }
+
+  res.setHeader(
+    'Set-Cookie',
+    'adonis_access=' +
+      encodeURIComponent(accessToken()) +
+      '; ' +
+      accessCookieOptions(req),
+  )
+
+  res.json({
+    unlocked: true,
+    message: 'Access granted.',
+  })
+})
+
+app.post('/api/lock', (req, res) => {
+  const secure =
+    req.secure || String(req.headers['x-forwarded-proto'] || '') === 'https'
+
+  res.setHeader(
+    'Set-Cookie',
+    'adonis_access=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' +
+      (secure ? '; Secure' : ''),
+  )
+
+  res.json({ unlocked: false })
 })
 
 app.get('/api/google/auth-url', async (_req, res) => {
@@ -251,6 +379,13 @@ async function runToolResponse(ai, message, history) {
 }
 
 app.post('/api/chat', async (req, res) => {
+  if (!hasAccess(req)) {
+    return res.status(423).json({
+      locked: true,
+      error: 'Enter keyword to continue.',
+    })
+  }
+
   const message = String(req.body?.message || '').trim()
   const history = req.body?.history
 
