@@ -1,4 +1,4 @@
-# NEXUS
+# ADONIS
 
 A cinematic personal AI control interface with an original identity, visually influenced by hard-edged rogue-AI control rooms and refined assistant HUDs without copying film assets, logos, character likenesses, or source code.
 
@@ -122,7 +122,7 @@ The requested scopes are read-only.
 
 ## Optional desktop companion
 
-The cloud website cannot directly control a Windows PC. NEXUS therefore includes a local-agent integration contract instead of pretending otherwise.
+The cloud website cannot directly control a Windows PC. ADONIS therefore includes a local-agent integration contract instead of pretending otherwise.
 
 The configured companion must expose:
 
