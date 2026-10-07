@@ -9,7 +9,12 @@ import {
   getGoogleAuthUrl,
   getGoogleStatus,
 } from './google.js'
-import { executeTool, toolDeclarations } from './tools.js'
+import { getLocalAgentStatus } from './localAgent.js'
+import {
+  executeTool,
+  listCapabilities,
+  toolDeclarations,
+} from './tools.js'
 
 const app = express()
 const port = process.env.PORT || 3001
@@ -18,13 +23,20 @@ const model = 'gemini-3.8-flash'
 app.use(express.json({ limit: '32kb' }))
 
 app.get('/api/health', async (_req, res) => {
-  const google = await getGoogleStatus()
+  const [google, localAgent] = await Promise.all([
+    getGoogleStatus(),
+    getLocalAgentStatus(),
+  ])
 
   res.json({
     ok: true,
     aiConfigured: Boolean(process.env.GEMINI_API_KEY),
     model,
-    integrations: { google },
+    capabilities: listCapabilities(),
+    integrations: {
+      google,
+      localAgent,
+    },
   })
 })
 
@@ -73,7 +85,7 @@ app.post('/api/chat', async (req, res) => {
 
   if (!process.env.GEMINI_API_KEY) {
     return res.status(503).json({
-      error: 'Gemini is not configured. Add GEMINI_API_KEY to your local .env file.',
+      error: 'Gemini is not configured. Add GEMINI_API_KEY to the server environment.',
     })
   }
 
@@ -81,15 +93,17 @@ app.post('/api/chat', async (req, res) => {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
     const input = [
-      'You are JARVIS, the intelligence core of a cinematic personal AI interface.',
-      'Be concise, calm, capable, and practical.',
+      'You are NEXUS, the intelligence core of a cinematic personal AI control interface.',
+      'Your visual interface is austere, industrial, precise, and high-energy. Your behavior must remain calm, safe, helpful, and controlled.',
+      'Sound concise and capable. Use restrained technical language when it helps, but do not become theatrical or threatening.',
       'Never claim a real-world action occurred unless a tool result explicitly confirms it.',
-      'Use the available tools when the user asks for weather, their schedule, unread email, a website to open, or a web search.',
-      'Browser actions are only prepared for the user to activate; never say a website has already opened.',
-      'If Calendar or Gmail is disconnected, explain that the Google Link control must be used.',
-      'Keep most responses under 180 words unless the user asks for detail.',
+      'Use available capabilities for weather, Calendar, Gmail, browser actions, web-search actions, and paired desktop-agent actions.',
+      'Browser actions are prepared for visible user activation; never claim a website has already opened.',
+      'Use run_local_action only when the user explicitly asks for one of the allow-listed harmless desktop actions.',
+      'If Calendar, Gmail, or the local desktop companion is disconnected, state that clearly rather than inventing access.',
+      'Keep most responses under 180 words unless the user requests detail.',
       '',
-      'USER COMMAND:',
+      'USER DIRECTIVE:',
       message,
     ].join('\n')
 
@@ -104,7 +118,7 @@ app.post('/api/chat', async (req, res) => {
     const actions = []
     const toolLog = []
 
-    for (let round = 0; round < 3; round += 1) {
+    for (let round = 0; round < 4; round += 1) {
       const calls = (interaction.steps || []).filter(
         (step) => step.type === 'function_call',
       )
@@ -126,7 +140,7 @@ app.post('/api/chat', async (req, res) => {
             },
             hud: {
               type: 'error',
-              title: 'Tool failure',
+              title: 'Executor failure',
               subtitle: error.message,
             },
           }
@@ -173,7 +187,7 @@ app.post('/api/chat', async (req, res) => {
   } catch (error) {
     console.error('Gemini request failed:', error)
     res.status(500).json({
-      error: 'The AI core failed to respond. Check the server terminal for details.',
+      error: 'The neural core failed to respond. Check the server terminal for details.',
     })
   }
 })
@@ -192,5 +206,5 @@ app.use((req, res, next) => {
 })
 
 app.listen(port, () => {
-  console.log(`JARVIS server online at http://localhost:${port}`)
+  console.log(`NEXUS server online at http://localhost:${port}`)
 })
