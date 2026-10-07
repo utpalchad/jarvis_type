@@ -21,5 +21,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Check server syntax
+        run: |
+          node --check server/server.js
+          node --check server/tools.js
+          node --check server/google.js
+
       - name: Build frontend
         run: npm run build
