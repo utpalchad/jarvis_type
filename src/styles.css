@@ -2151,3 +2151,221 @@ input:focus-visible {
     gap: 6px 13px;
   }
 }
+
+
+/* ===== ADONIS access gate ===== */
+.adonis-lock-screen {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 88, 31, .10), transparent 20%),
+    radial-gradient(circle at 50% 50%, rgba(122, 25, 13, .08), transparent 38%),
+    linear-gradient(180deg, #050505, #010101 74%);
+}
+
+.adonis-lock-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(255, 78, 42, .018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 78, 42, .014) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at center, #000 0 42%, transparent 82%);
+}
+
+.adonis-lock-aura {
+  position: absolute;
+  width: min(680px, 88vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 87, 45, .06);
+  box-shadow:
+    0 0 90px rgba(255, 63, 27, .04),
+    inset 0 0 90px rgba(255, 79, 31, .025);
+  animation: lockAura 8s linear infinite;
+}
+
+.adonis-lock-aura::before,
+.adonis-lock-aura::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 91, 48, .08);
+}
+
+.adonis-lock-aura::before {
+  inset: 10%;
+}
+
+.adonis-lock-aura::after {
+  inset: 22%;
+}
+
+@keyframes lockAura {
+  to { transform: rotate(360deg); }
+}
+
+.adonis-lock-card {
+  position: relative;
+  z-index: 2;
+  width: min(520px, 92vw);
+  padding: 44px 38px 34px;
+  text-align: center;
+  border: 1px solid rgba(255, 91, 54, .16);
+  background:
+    linear-gradient(135deg, rgba(255, 62, 32, .025), transparent 40%),
+    rgba(4, 4, 4, .90);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, .72),
+    inset 0 0 50px rgba(255, 72, 32, .018);
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+}
+
+.adonis-lock-mark {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 20px;
+  border: 1px solid rgba(255, 86, 49, .48);
+  border-radius: 50%;
+  color: #efd2c5;
+  box-shadow:
+    0 0 30px rgba(255, 67, 31, .09),
+    inset 0 0 24px rgba(255, 75, 33, .06);
+}
+
+.adonis-lock-mark::before,
+.adonis-lock-mark::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+}
+
+.adonis-lock-mark::before {
+  inset: 8px;
+  border: 1px dashed rgba(255, 111, 64, .33);
+  animation: lockAura 8s linear infinite reverse;
+}
+
+.adonis-lock-mark::after {
+  inset: 20px;
+  border: 1px solid rgba(255, 105, 58, .24);
+}
+
+.adonis-lock-mark span {
+  position: relative;
+  z-index: 1;
+  font: 600 25px Rajdhani, sans-serif;
+  letter-spacing: .08em;
+}
+
+.adonis-lock-card h1 {
+  margin: 0;
+  color: #e7e9e9;
+  font: 600 22px Rajdhani, sans-serif;
+  letter-spacing: .46em;
+  padding-left: .46em;
+}
+
+.adonis-lock-card > p {
+  margin: 12px 0 24px;
+  color: #6d7172;
+  font: 600 8px Rajdhani, sans-serif;
+  letter-spacing: .26em;
+}
+
+.adonis-lock-form {
+  display: grid;
+  grid-template-columns: 1fr 54px 54px;
+  align-items: stretch;
+  min-height: 58px;
+  border: 1px solid rgba(255, 86, 50, .24);
+  background: rgba(2, 2, 2, .86);
+  box-shadow: inset 0 0 22px rgba(255, 66, 30, .018);
+}
+
+.adonis-lock-form input {
+  min-width: 0;
+  padding: 0 18px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #d7d9d9;
+  font-size: 12px;
+  letter-spacing: .12em;
+}
+
+.adonis-lock-form input::placeholder {
+  color: #44494a;
+  letter-spacing: .08em;
+}
+
+.adonis-lock-submit,
+.adonis-lock-mic {
+  border: 0;
+  border-left: 1px solid rgba(255, 88, 50, .14);
+  background: transparent;
+  cursor: pointer;
+  transition: .16s ease;
+}
+
+.adonis-lock-submit {
+  color: #ff6047;
+  font-size: 18px;
+}
+
+.adonis-lock-mic {
+  color: #777c7d;
+  font-size: 15px;
+}
+
+.adonis-lock-submit:hover,
+.adonis-lock-mic:hover,
+.adonis-lock-mic.is-listening {
+  color: #ffd0b8;
+  background: rgba(255, 70, 36, .06);
+  text-shadow: 0 0 12px rgba(255, 80, 42, .44);
+}
+
+.adonis-lock-mic.is-listening {
+  animation: lockMicPulse .65s ease-in-out infinite alternate;
+}
+
+@keyframes lockMicPulse {
+  to {
+    box-shadow: inset 0 0 22px rgba(255, 74, 37, .11);
+  }
+}
+
+.adonis-lock-submit:disabled,
+.adonis-lock-mic:disabled,
+.adonis-lock-form input:disabled {
+  opacity: .38;
+  cursor: default;
+}
+
+.adonis-lock-card > small {
+  display: block;
+  margin-top: 16px;
+  color: #44494a;
+  font: 600 6px Rajdhani, sans-serif;
+  letter-spacing: .20em;
+}
+
+@media (max-width: 560px) {
+  .adonis-lock-card {
+    padding: 36px 20px 28px;
+  }
+
+  .adonis-lock-form {
+    grid-template-columns: 1fr 48px 48px;
+  }
+}
