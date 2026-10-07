@@ -2,21 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import CoreScene from './components/CoreScene.jsx'
 import ContextHud from './components/ContextHud.jsx'
 
-const systemModules = [
-  ['LANGUAGE MODEL', 'ONLINE'],
-  ['MULTIMODAL CORE', 'ONLINE'],
-  ['TOOL INTERFACE', 'ONLINE'],
-  ['MEMORY CORE', 'SESSION'],
-  ['SAFETY LAYER', 'ONLINE'],
-]
-
 const activeModules = [
-  ['STRATEGIC ANALYSIS', 94],
-  ['CREATIVE GENERATION', 88],
-  ['CODE & ENGINEERING', 92],
-  ['RESEARCH & SYNTHESIS', 84],
-  ['PLANNING & AUTOMATION', 79],
-  ['VISION & MULTIMODAL', 73],
+  ['STRATEGIC ANALYSIS', 91],
+  ['CREATIVE GENERATION', 87],
+  ['CODE & ENGINEERING', 94],
+  ['RESEARCH & SYNTHESIS', 83],
+  ['PLANNING & AUTOMATION', 78],
+  ['VISION & MULTIMODAL', 72],
 ]
 
 const quickCommands = [
@@ -33,7 +25,9 @@ function App() {
   const [command, setCommand] = useState('')
   const [lastCommand, setLastCommand] = useState('')
   const [status, setStatus] = useState('STANDBY')
-  const [reply, setReply] = useState('I’m ready. Ask anything.')
+  const [reply, setReply] = useState(
+    'I’m ready.\n\nI can analyze, create, reason, and execute complex tasks across multiple domains. How can I help you today?',
+  )
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
@@ -52,9 +46,10 @@ function App() {
   })
 
   const clock = useClock()
+  const date = useDate()
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setBooted(true), 2400)
+    const timer = window.setTimeout(() => setBooted(true), 2300)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -72,6 +67,7 @@ function App() {
     try {
       const response = await fetch('/api/health')
       const data = await response.json()
+
       setAiOnline(Boolean(data.aiConfigured))
       setGoogleStatus(
         data.integrations?.google || { configured: false, connected: false },
@@ -207,7 +203,6 @@ function App() {
     utterance.rate = 0.93
     utterance.pitch = 0.78
     utterance.volume = 0.95
-
     utterance.onstart = () => setStatus('SPEAKING')
     utterance.onend = () => setStatus('STANDBY')
     utterance.onerror = () => setStatus('STANDBY')
@@ -250,8 +245,16 @@ function App() {
 
   if (!booted) return <BootSequence />
 
+  const systems = [
+    ['LANGUAGE MODELS', aiOnline ? 'ONLINE' : 'STANDBY'],
+    ['MULTIMODAL CORE', 'ONLINE'],
+    ['TOOL INTERFACE', aiOnline ? 'ONLINE' : 'STANDBY'],
+    ['MEMORY CORE', interactionId ? 'ONLINE' : 'SESSION'],
+    ['SAFETY LAYER', 'ONLINE'],
+  ]
+
   return (
-    <main className="nexus-shell">
+    <main className="nexus-shell nexus-reference-layout">
       <div className="industrial-grid" />
       <div className="red-scan" />
       <div className="corner-vignette" />
@@ -266,58 +269,62 @@ function App() {
         </div>
 
         <nav className="top-nav" aria-label="Primary">
-          <button className="nav-active">CORE</button>
-          <button onClick={() => setCommand('Show me your current capabilities.')}>CAPABILITIES</button>
-          <button onClick={() => setCommand('Give me a concise system status.')}>SYSTEM</button>
+          <button className="nav-active">HOME</button>
+          <button onClick={() => setCommand('Show me your current capabilities.')}>
+            CAPABILITIES
+          </button>
+          <button onClick={() => setCommand('Give me a concise system status.')}>
+            SYSTEM
+          </button>
           <button onClick={resetConversation}>SANDBOX</button>
+          <span className="nav-chevron">›</span>
         </nav>
 
-        <div className="top-time">
-          <span className={aiOnline ? 'sync-dot sync-online' : 'sync-dot'} />
-          <div>
-            <small>{aiOnline ? 'SYNC STABLE' : 'SYNC DEGRADED'}</small>
-            <strong>{clock}</strong>
-          </div>
-        </div>
+        <button className="profile-control" aria-label="Profile">
+          <span>●</span>
+        </button>
       </header>
 
       <section className="control-room">
         <aside className="left-console">
-          <HudPanel title="AI ASSISTANT" status={aiOnline ? 'ONLINE' : 'STANDBY'}>
-            <div className="metric-stack">
-              <Metric label="SYNTAX" value={100} />
-              <Metric label="REASONING" value={98} />
-              <Metric label="CONTEXT" value={96} />
-              <Metric label="ALIGNMENT" value={99} />
+          <HudPanel compact title="AI ASSISTANT" status={aiOnline ? 'ONLINE' : 'STANDBY'}>
+            <div className="assistant-wave">
+              <MiniSignal status={status} compact />
             </div>
           </HudPanel>
 
-          <HudPanel title="SYSTEMS">
+          <HudPanel title="CORE STATUS">
+            <div className="metric-stack">
+              <Metric label="SYNTAX" value={100} />
+              <Metric label="REASONING" value={100} />
+              <Metric label="CONTEXT" value={100} />
+              <Metric label="ALIGNMENT" value={98} />
+            </div>
+
+            <div className="section-divider" />
+
+            <div className="systems-title">SYSTEMS</div>
             <div className="system-list">
-              {systemModules.map(([label, fallback]) => {
-                let value = fallback
-                if (label === 'TOOL INTERFACE' && !aiOnline) value = 'STANDBY'
-                if (label === 'MEMORY CORE') value = interactionId ? 'ACTIVE' : 'SESSION'
-                return (
-                  <div className="system-row" key={label}>
-                    <span>{label}</span>
-                    <b className={value === 'ONLINE' || value === 'ACTIVE' ? 'state-live' : ''}>{value}</b>
-                  </div>
-                )
-              })}
-              <div className="system-row">
-                <span>GOOGLE LINK</span>
-                <b className={googleStatus.connected ? 'state-live' : ''}>
-                  {googleStatus.connected ? 'ONLINE' : 'OPTIONAL'}
-                </b>
-              </div>
+              {systems.map(([label, value]) => (
+                <div className="system-row" key={label}>
+                  <span>{label}</span>
+                  <b className={value === 'ONLINE' ? 'state-live' : ''}>
+                    {value}
+                  </b>
+                </div>
+              ))}
               <div className="system-row">
                 <span>LOCAL AGENT</span>
                 <b className={agentStatus.online ? 'state-live' : ''}>
-                  {agentStatus.online ? 'ONLINE' : agentStatus.configured ? 'OFFLINE' : 'UNPAIRED'}
+                  {agentStatus.online
+                    ? 'ONLINE'
+                    : agentStatus.configured
+                      ? 'OFFLINE'
+                      : 'UNPAIRED'}
                 </b>
               </div>
             </div>
+
             <MiniSignal status={status} />
           </HudPanel>
 
@@ -326,22 +333,28 @@ function App() {
               <span />
               <i />
               <b />
+              <em />
             </div>
             <div>
               <small>GLOBAL CONTEXT</small>
               <strong><em /> LIVE</strong>
               <span>DATA STREAMS</span>
-              <b>{toolLog.length || 1} ACTIVE</b>
+              <b>{Math.max(1, toolLog.length)} ACTIVE</b>
             </div>
           </div>
         </aside>
 
         <section className="orb-chamber">
+          <div className="chamber-backplate" />
           <div className="chamber-rail rail-left" />
           <div className="chamber-rail rail-right" />
           <div className="ceiling-strut strut-a" />
           <div className="ceiling-strut strut-b" />
+          <div className="ceiling-strut strut-c" />
+          <div className="ceiling-strut strut-d" />
+
           <CoreScene status={status} />
+
           <div className="orb-shadow" />
           <div className="orb-pedestal">
             <span /><i /><b />
@@ -351,13 +364,27 @@ function App() {
             <span>NEURAL CORE // NX-01</span>
             <strong>{statusHeadline(status)}</strong>
             <small>
-              {lastCommand ? lastCommand : 'Higher intelligence, under deliberate control.'}
+              {lastCommand || 'Drag to rotate / scroll to zoom / click to pulse'}
             </small>
           </div>
         </section>
 
         <aside className="right-console">
-          <HudPanel title="RESPONSE" status={error ? 'FAULT' : status}>
+          <div className="sync-card">
+            <div className="sync-wave">
+              <MiniSignal status={status} compact />
+            </div>
+            <div className="sync-copy">
+              <small>SYNC</small>
+              <strong><i className={aiOnline ? 'sync-live' : ''} /> {aiOnline ? 'STABLE' : 'STANDBY'}</strong>
+            </div>
+            <div className="sync-time">
+              <b>{clock.slice(0, 5)}</b>
+              <span>{date}</span>
+            </div>
+          </div>
+
+          <HudPanel title="RESPONSE" status={error ? 'FAULT' : responseLatencyLabel(status)}>
             <div className={'response-body ' + (error ? 'response-fault' : '')}>
               <Typewriter text={error || reply} />
             </div>
@@ -365,35 +392,22 @@ function App() {
               <span>MULTIMODAL</span>
               <span>TOOLS</span>
               <span>REAL-TIME DATA</span>
+              <b>•••</b>
             </div>
           </HudPanel>
 
           <HudPanel title="ACTIVE MODULES">
             <div className="module-list">
-              {activeModules.map(([label, score]) => (
+              {activeModules.map(([label, score], index) => (
                 <div className="module-row" key={label}>
-                  <span className="module-glyph">◇</span>
+                  <span className="module-glyph">
+                    {['◇', '◉', '⬡', '◈', '✧', '◇'][index]}
+                  </span>
                   <strong>{label}</strong>
                   <i><b style={{ width: score + '%' }} /></i>
                 </div>
               ))}
             </div>
-          </HudPanel>
-
-          <HudPanel title="EXECUTION TRACE">
-            {toolLog.length ? (
-              <div className="trace-list">
-                {toolLog.slice(-5).map((tool, index) => (
-                  <div className="trace-item" key={tool.name + index}>
-                    <span>{String(index + 1).padStart(2, '0')}</span>
-                    <strong>{tool.name.replaceAll('_', ' ')}</strong>
-                    <b>{tool.status}</b>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="quiet-copy">No external tools invoked in this session.</p>
-            )}
           </HudPanel>
         </aside>
 
@@ -405,19 +419,18 @@ function App() {
         />
       </section>
 
-      <section className="command-deck">
+      <section className="command-deck reference-command-deck">
         <form className="command-console" onSubmit={submitCommand}>
           <button
             type="button"
-            className={'mic-control ' + (listening ? 'mic-active' : '')}
-            onClick={startListening}
-            aria-label="Start voice input"
+            className="deck-settings"
+            aria-label="Interface controls"
+            onClick={() => setCommand('Give me a concise system status.')}
           >
-            <span>◉</span>
+            <span>☷</span>
           </button>
 
           <div className="command-input-wrap">
-            <small>{listening ? 'VOICE CHANNEL OPEN' : 'DIRECTIVE CHANNEL'}</small>
             <input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
@@ -426,18 +439,44 @@ function App() {
             />
           </div>
 
-          <button
-            type="button"
-            className="voice-toggle"
-            onClick={() => setVoiceEnabled((value) => !value)}
-          >
-            {voiceEnabled ? 'VOICE' : 'MUTE'}
-          </button>
+          <div className="command-tools">
+            <button type="button" title="Attach">⌁</button>
+            <button
+              type="button"
+              title="Search"
+              onClick={() => setCommand('Search the web for ')}
+            >
+              ◎
+            </button>
+            <button
+              type="button"
+              title="Capabilities"
+              onClick={() => setCommand('Show me your current capabilities.')}
+            >
+              ▦
+            </button>
+            <button
+              type="button"
+              title={voiceEnabled ? 'Voice enabled' : 'Voice muted'}
+              onClick={() => setVoiceEnabled((value) => !value)}
+            >
+              {voiceEnabled ? '◉' : '○'}
+            </button>
+            <button
+              type="button"
+              className={'mic-inline ' + (listening ? 'mic-active' : '')}
+              onClick={startListening}
+              title="Microphone"
+            >
+              ♫
+            </button>
+          </div>
 
           <button
             className="execute-control"
             type="submit"
             disabled={status === 'PROCESSING'}
+            aria-label="Execute command"
           >
             <span>➤</span>
           </button>
@@ -456,25 +495,26 @@ function App() {
               <span /> {label}
             </button>
           ))}
-          {!googleStatus.connected && (
-            <button onClick={connectGoogle}><span /> LINK GOOGLE</button>
-          )}
         </div>
       </section>
 
+      <div className="reference-tagline">
+        <strong>HIGHER INTELLIGENCE.</strong>
+        <span>A MORE INTERESTING TOMORROW.</span>
+      </div>
+
       <footer className="nexus-footer">
-        <span>NEXUS // BUILD 0.8</span>
-        <span>GEMINI CORE</span>
-        <span>CONTEXTUAL EXECUTOR LAYER</span>
+        <span>NEXUS // BUILD 0.9</span>
+        <span>{googleStatus.connected ? 'GOOGLE LINKED' : 'GOOGLE OPTIONAL'}</span>
         <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
     </main>
   )
 }
 
-function HudPanel({ title, status, children }) {
+function HudPanel({ title, status, children, compact = false }) {
   return (
-    <section className="hud-panel">
+    <section className={'hud-panel ' + (compact ? 'hud-panel-compact' : '')}>
       <div className="hud-panel-head">
         <div>
           <span className="panel-red-dot" />
@@ -497,14 +537,23 @@ function Metric({ label, value }) {
   )
 }
 
-function MiniSignal({ status }) {
-  const boost = status === 'PROCESSING' || status === 'SPEAKING'
+function MiniSignal({ status, compact = false }) {
+  const boost =
+    status === 'PROCESSING' ||
+    status === 'SPEAKING' ||
+    status === 'LISTENING'
+
   return (
-    <div className={'mini-signal ' + (boost ? 'signal-boost' : '')}>
+    <div className={'mini-signal ' + (boost ? 'signal-boost ' : '') + (compact ? 'mini-signal-compact' : '')}>
       <svg viewBox="0 0 280 54" preserveAspectRatio="none">
         <polyline points="0,33 15,29 28,35 42,14 57,38 71,26 83,40 98,20 111,32 125,28 139,10 151,34 166,23 181,38 195,27 210,31 225,16 240,35 255,24 270,29 280,19" />
       </svg>
-      <div><span>REAL-TIME PROCESSING</span><b>{boost ? 'BURST' : 'STABLE'}</b></div>
+      {!compact && (
+        <div>
+          <span>REAL-TIME PROCESSING</span>
+          <b>{boost ? 'BURST' : '42.6 TFLOPS'}</b>
+        </div>
+      )}
     </div>
   )
 }
@@ -557,6 +606,26 @@ function useClock() {
   }, [formatter])
 
   return time
+}
+
+function useDate() {
+  const formatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+      }),
+    [],
+  )
+
+  return formatter.format(new Date()).toUpperCase()
+}
+
+function responseLatencyLabel(status) {
+  if (status === 'PROCESSING') return '...'
+  if (status === 'ERROR') return 'FAULT'
+  return '2.3s'
 }
 
 function statusHeadline(status) {
