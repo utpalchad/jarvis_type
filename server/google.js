@@ -9,7 +9,9 @@ const __dirname = path.dirname(__filename)
 const tokenDir = path.resolve(__dirname, '../.jarvis')
 const tokenFile = path.join(tokenDir, 'google-tokens.json')
 
-const pendingStates = new Set()\n\nconst scopes = [
+const pendingStates = new Set()
+
+const scopes = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/gmail.readonly',
 ]
