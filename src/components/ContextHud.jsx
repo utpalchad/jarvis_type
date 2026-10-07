@@ -104,7 +104,7 @@ export default function ContextHud({ hud, actions, onAction, onGoogleConnect }) 
         <div className="context-content">
           <div className="context-kicker">INTEGRATION // REQUIRED</div>
           <h3>{hud.service}</h3>
-          <p>That service is not paired with this NEXUS instance yet.</p>
+          <p>That service is not paired with this ADONIS instance yet.</p>
           {hud.service?.includes('Google') && (
             <button className="hud-action" onClick={onGoogleConnect}>
               LINK GOOGLE
