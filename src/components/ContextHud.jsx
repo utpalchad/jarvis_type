@@ -73,26 +73,43 @@ function EmailHud({ data }) {
   )
 }
 
+function AgentHud({ data }) {
+  return (
+    <div className="context-content">
+      <div className="context-kicker">LOCAL AGENT // STATUS</div>
+      <h3>{data.online ? 'Desktop channel online' : 'Desktop channel unavailable'}</h3>
+      <p>
+        {data.online
+          ? 'A paired local companion can receive allow-listed desktop actions.'
+          : 'The cloud interface is active, but no trusted desktop companion is connected.'}
+      </p>
+    </div>
+  )
+}
+
 export default function ContextHud({ hud, actions, onAction, onGoogleConnect }) {
   if (!hud && !actions?.length) return null
 
   return (
-    <aside className="context-hud">
+    <aside className="context-hud context-hud-v2">
       <div className="context-bracket context-bracket-a" />
       <div className="context-bracket context-bracket-b" />
 
       {hud?.type === 'weather' && <WeatherHud data={hud} />}
       {hud?.type === 'schedule' && <ScheduleHud data={hud} />}
       {hud?.type === 'email' && <EmailHud data={hud} />}
+      {hud?.type === 'agent' && <AgentHud data={hud} />}
 
       {hud?.type === 'integration' && (
         <div className="context-content">
           <div className="context-kicker">INTEGRATION // REQUIRED</div>
           <h3>{hud.service}</h3>
-          <p>Google access has not been paired with this JARVIS instance.</p>
-          <button className="hud-action" onClick={onGoogleConnect}>
-            LINK GOOGLE
-          </button>
+          <p>That service is not paired with this NEXUS instance yet.</p>
+          {hud.service?.includes('Google') && (
+            <button className="hud-action" onClick={onGoogleConnect}>
+              LINK GOOGLE
+            </button>
+          )}
         </div>
       )}
 
@@ -106,7 +123,7 @@ export default function ContextHud({ hud, actions, onAction, onGoogleConnect }) 
 
       {hud?.type === 'error' && (
         <div className="context-content context-error">
-          <div className="context-kicker">TOOL // ERROR</div>
+          <div className="context-kicker">EXECUTOR // FAULT</div>
           <h3>{hud.title}</h3>
           <p>{hud.subtitle}</p>
         </div>
@@ -117,7 +134,7 @@ export default function ContextHud({ hud, actions, onAction, onGoogleConnect }) 
           {actions.map((action, index) => (
             <button
               className="hud-action"
-              key={action.url + index}
+              key={(action.url || action.label) + index}
               onClick={() => onAction(action)}
             >
               {action.label}
