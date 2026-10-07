@@ -30,7 +30,7 @@ app.get('/api/health', async (_req, res) => {
 
   res.json({
     ok: true,
-    aiConfigured: Boolean(process.env.GEMINI_API_KEY),
+    aiConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
     model,
     capabilities: listCapabilities(),
     integrations: {
@@ -83,14 +83,16 @@ app.post('/api/chat', async (req, res) => {
     return res.status(400).json({ error: 'Command is too long.' })
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+
+  if (!geminiApiKey) {
     return res.status(503).json({
-      error: 'Gemini is not configured. Add GEMINI_API_KEY to the server environment.',
+      error: 'Gemini is not configured. Add GEMINI_API_KEY (or GOOGLE_API_KEY) to the server environment.',
     })
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    const ai = new GoogleGenAI({ apiKey: geminiApiKey })
 
     const input = [
       'You are ADONIS, the intelligence core of a cinematic personal AI control interface.',
