@@ -2,6 +2,32 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import CoreScene from './components/CoreScene.jsx'
 import ContextHud from './components/ContextHud.jsx'
 
+const MEMORY_STORAGE_KEY = 'adonis_explicit_memories_v1'
+
+function loadSavedMemories() {
+  try {
+    const raw = window.localStorage.getItem(MEMORY_STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.slice(-50) : []
+  } catch {
+    return []
+  }
+}
+
+function writeSavedMemories(memories) {
+  try {
+    window.localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memories))
+  } catch {
+    // Memory remains available for this session if storage is unavailable.
+  }
+}
+
+function containsSensitiveMemory(text) {
+  return /\b(password|passcode|pin|otp|api[ _-]?key|secret[ _-]?key|access[ _-]?token|refresh[ _-]?token|credit card|cvv)\b/i.test(
+    text,
+  )
+}
+
 const activeModules = [
   ['STRATEGIC ANALYSIS', 91],
   ['CREATIVE GENERATION', 87],
@@ -38,6 +64,7 @@ function App() {
   const [aiOnline, setAiOnline] = useState(false)
   const [interactionId, setInteractionId] = useState(null)
   const [chatHistory, setChatHistory] = useState([])
+  const [memories, setMemories] = useState(() => loadSavedMemories())
   const [lastLatency, setLastLatency] = useState(null)
   const [hud, setHud] = useState(null)
   const [actions, setActions] = useState([])
@@ -103,6 +130,121 @@ function App() {
     }
   }
 
+  function persistMemories(nextMemories) {
+    const limited = nextMemories.slice(-50)
+    setMemories(limited)
+    writeSavedMemories(limited)
+  }
+
+  function localResponse(text, commandLabel = 'MEMORY CORE') {
+    setCommand('')
+    setLastCommand(commandLabel)
+    setError('')
+    setHud(null)
+    setActions([])
+    setToolLog([])
+    setReply(text)
+
+    if (voiceEnabled) {
+      setStatus('SPEAKING')
+      speak(text, () => setStatus('STANDBY'))
+    } else {
+      setStatus('READY')
+      window.setTimeout(() => setStatus('STANDBY'), 700)
+    }
+  }
+
+  function handleMemoryCommand(text) {
+    const clean = String(text || '').trim()
+    const withoutName = clean.replace(/^adonis\s*[,,:-]?\s*/i, '')
+    const rememberMatch = withoutName.match(/^remember(?:\s+that)?\s+(.+)$/i)
+
+    if (rememberMatch) {
+      const memoryText = rememberMatch[1].trim()
+
+      if (!memoryText) {
+        localResponse('Tell me what you want me to remember.')
+        return true
+      }
+
+      if (containsSensitiveMemory(memoryText)) {
+        localResponse(
+          'I will not store passwords, access codes, API keys, tokens, or similar secrets in memory.',
+        )
+        return true
+      }
+
+      const duplicate = memories.some(
+        (item) => item.text.toLowerCase() === memoryText.toLowerCase(),
+      )
+
+      if (!duplicate) {
+        persistMemories([
+          ...memories,
+          {
+            id:
+              window.crypto?.randomUUID?.() ||
+              String(Date.now()) + '-' + String(Math.random()).slice(2),
+            text: memoryText,
+            createdAt: new Date().toISOString(),
+          },
+        ])
+      }
+
+      localResponse(
+        duplicate
+          ? 'I already remember that.'
+          : 'Remembered: ' + memoryText,
+      )
+      return true
+    }
+
+    if (
+      /^(what do you remember|what have you remembered|show (?:me )?(?:your|my )?memories|list memories|memory list)\??$/i.test(
+        withoutName,
+      )
+    ) {
+      if (!memories.length) {
+        localResponse('I do not have any saved memories yet.')
+        return true
+      }
+
+      const summary = memories
+        .slice(-12)
+        .map((item, index) => String(index + 1) + '. ' + item.text)
+        .join('\n')
+
+      localResponse('Here is what I remember:\n' + summary)
+      return true
+    }
+
+    if (/^(forget everything|forget all|clear memories|clear memory)$/i.test(withoutName)) {
+      persistMemories([])
+      localResponse('Memory cleared.')
+      return true
+    }
+
+    const forgetMatch = withoutName.match(/^forget(?:\s+that)?\s+(.+)$/i)
+
+    if (forgetMatch) {
+      const target = forgetMatch[1].trim().toLowerCase()
+      const remaining = memories.filter(
+        (item) => !item.text.toLowerCase().includes(target),
+      )
+
+      if (remaining.length === memories.length) {
+        localResponse('I could not find a matching saved memory.')
+      } else {
+        persistMemories(remaining)
+        localResponse('Forgot the matching memory.')
+      }
+
+      return true
+    }
+
+    return false
+  }
+
   async function sendCommand(text) {
     const clean = String(text || '').trim()
     if (!clean || status === 'PROCESSING') return
@@ -111,6 +253,8 @@ function App() {
       await attemptUnlock(clean)
       return
     }
+
+    if (handleMemoryCommand(clean)) return
 
     pauseWakeRecognition()
     window.speechSynthesis?.cancel()
@@ -130,6 +274,7 @@ function App() {
         body: JSON.stringify({
           message: clean,
           history: chatHistory.slice(-8),
+          memories: memories.slice(-30).map((item) => item.text),
         }),
       })
 
@@ -566,7 +711,7 @@ function App() {
     ['LANGUAGE MODELS', aiOnline ? 'ONLINE' : 'STANDBY'],
     ['MULTIMODAL CORE', 'ONLINE'],
     ['TOOL INTERFACE', aiOnline ? 'ONLINE' : 'STANDBY'],
-    ['MEMORY CORE', chatHistory.length ? 'ONLINE' : 'SESSION'],
+    ['MEMORY CORE', memories.length ? memories.length + ' SAVED' : 'EMPTY'],
     ['SAFETY LAYER', 'ONLINE'],
     ['ACCESS GATE', unlocked ? 'UNLOCKED' : 'LOCKED'],
     ['VOICE ACCESS', wakeEnabled ? (wakeListening ? 'ARMED' : 'PAUSED') : 'OFF'],
@@ -846,7 +991,7 @@ function App() {
       </div>
 
       <footer className="nexus-footer">
-        <span>ADONIS // BUILD 1.2</span>
+        <span>ADONIS // BUILD 1.3</span>
         <span>{googleStatus.connected ? 'GOOGLE LINKED' : 'GOOGLE OPTIONAL'}</span>
         <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
