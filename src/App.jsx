@@ -401,7 +401,7 @@ function App() {
     const period =
       hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 
-    return period + '. Access granted. ADONIS online. What can I do for you?'
+    return period + ', UTPAL. Access granted. ADONIS online. What can I do for you?'
   }
 
   function pauseWakeRecognition() {
