@@ -3,78 +3,10 @@ import {
   getUpcomingEvents,
   getUnreadEmailSummaries,
 } from './google.js'
-
-export const toolDeclarations = [
-  {
-    type: 'function',
-    name: 'get_weather',
-    description:
-      'Get current weather and a short forecast for a city or place. Use this whenever the user asks about weather, temperature, rain, or whether they should carry an umbrella.',
-    parameters: {
-      type: 'object',
-      properties: {
-        location: {
-          type: 'string',
-          description: 'City or place, optionally with state/country.',
-        },
-      },
-      required: ['location'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'open_website',
-    description:
-      'Prepare a safe browser action when the user explicitly asks to open a website or web app. This tool only returns a link for the user to activate.',
-    parameters: {
-      type: 'object',
-      properties: {
-        destination: {
-          type: 'string',
-          description:
-            'A common site name such as YouTube, GitHub, Gmail, Google Calendar, or a full HTTPS URL.',
-        },
-      },
-      required: ['destination'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'search_web',
-    description:
-      'Prepare a browser search action when the user explicitly asks to search the web. This returns a Google search URL rather than claiming search results.',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'The exact safe search query.',
-        },
-      },
-      required: ['query'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'get_schedule',
-    description:
-      'Read the next events from the connected Google Calendar. Use only when the user asks about their schedule, calendar, classes, meetings, or upcoming events.',
-    parameters: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    type: 'function',
-    name: 'get_unread_emails',
-    description:
-      'Read a short metadata summary of unread Gmail messages from the connected account. Use only when the user asks about unread or recent email.',
-    parameters: {
-      type: 'object',
-      properties: {},
-    },
-  },
-]
+import {
+  getLocalAgentStatus,
+  runLocalAgentAction,
+} from './localAgent.js'
 
 const knownSites = {
   youtube: 'https://www.youtube.com/',
@@ -83,6 +15,7 @@ const knownSites = {
   'google calendar': 'https://calendar.google.com/',
   calendar: 'https://calendar.google.com/',
   google: 'https://www.google.com/',
+  render: 'https://dashboard.render.com/',
 }
 
 function weatherText(code) {
@@ -200,8 +133,7 @@ async function getSchedule() {
     return {
       modelResult: {
         connected: false,
-        message:
-          'Google Calendar is not connected yet. Tell the user to use the Google Link control in the interface.',
+        message: 'Google Calendar is not connected yet.',
       },
       hud: {
         type: 'integration',
@@ -224,8 +156,7 @@ async function getEmails() {
     return {
       modelResult: {
         connected: false,
-        message:
-          'Gmail is not connected yet. Tell the user to use the Google Link control in the interface.',
+        message: 'Gmail is not connected yet.',
       },
       hud: {
         type: 'integration',
@@ -242,56 +173,202 @@ async function getEmails() {
   }
 }
 
+async function getAgentStatusCapability() {
+  const status = await getLocalAgentStatus()
+  return {
+    modelResult: status,
+    hud: { type: 'agent', ...status },
+  }
+}
+
+async function runDesktopAction(args) {
+  const outcome = await runLocalAgentAction(args.action)
+
+  return {
+    modelResult: outcome,
+    hud: {
+      type: 'agent',
+      configured: true,
+      online: Boolean(outcome.connected),
+      action: args.action,
+    },
+  }
+}
+
+const capabilityRegistry = {
+  get_weather: {
+    declaration: {
+      type: 'function',
+      name: 'get_weather',
+      description:
+        'Get current weather and a short forecast for a city or place. Use for weather, temperature, rain, or umbrella questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          location: {
+            type: 'string',
+            description: 'City or place, optionally with state/country.',
+          },
+        },
+        required: ['location'],
+      },
+    },
+    handler: (args) => getWeather(args.location),
+  },
+
+  open_website: {
+    declaration: {
+      type: 'function',
+      name: 'open_website',
+      description:
+        'Prepare a safe browser action when the user explicitly asks to open a website. The user activates the visible action.',
+      parameters: {
+        type: 'object',
+        properties: {
+          destination: {
+            type: 'string',
+            description: 'Common site name or full HTTPS URL.',
+          },
+        },
+        required: ['destination'],
+      },
+    },
+    handler: async (args) => {
+      const url = resolveWebsite(args.destination)
+      return {
+        modelResult: {
+          prepared: true,
+          destination: args.destination,
+          note: 'The user must activate the browser action in the interface.',
+        },
+        action: {
+          type: 'open_url',
+          label: 'OPEN ' + String(args.destination || 'WEBSITE').toUpperCase(),
+          url,
+        },
+        hud: {
+          type: 'action',
+          title: 'Browser action prepared',
+          subtitle: args.destination,
+        },
+      }
+    },
+  },
+
+  search_web: {
+    declaration: {
+      type: 'function',
+      name: 'search_web',
+      description:
+        'Prepare a web search action when the user explicitly asks to search. Do not claim the results were read.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The exact search query.',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    handler: async (args) => {
+      const query = String(args.query || '').trim()
+      if (!query) throw new Error('Search query is empty.')
+
+      const url = 'https://www.google.com/search?q=' + encodeURIComponent(query)
+      return {
+        modelResult: {
+          prepared: true,
+          query,
+          note: 'A search action was prepared. Search results were not read.',
+        },
+        action: {
+          type: 'open_url',
+          label: 'OPEN SEARCH',
+          url,
+        },
+        hud: {
+          type: 'action',
+          title: 'Web search prepared',
+          subtitle: query,
+        },
+      }
+    },
+  },
+
+  get_schedule: {
+    declaration: {
+      type: 'function',
+      name: 'get_schedule',
+      description:
+        'Read upcoming events from the connected Google Calendar.',
+      parameters: { type: 'object', properties: {} },
+    },
+    handler: getSchedule,
+  },
+
+  get_unread_emails: {
+    declaration: {
+      type: 'function',
+      name: 'get_unread_emails',
+      description:
+        'Read short metadata summaries of unread Gmail messages from the connected account.',
+      parameters: { type: 'object', properties: {} },
+    },
+    handler: getEmails,
+  },
+
+  get_local_agent_status: {
+    declaration: {
+      type: 'function',
+      name: 'get_local_agent_status',
+      description:
+        'Check whether the user has deliberately paired a trusted local desktop companion.',
+      parameters: { type: 'object', properties: {} },
+    },
+    handler: getAgentStatusCapability,
+  },
+
+  run_local_action: {
+    declaration: {
+      type: 'function',
+      name: 'run_local_action',
+      description:
+        'Run an allow-listed harmless desktop action through the paired local companion. Use only when the user explicitly asks for that desktop action.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: [
+              'open_vscode',
+              'open_browser',
+              'open_spotify',
+              'open_github_desktop',
+              'volume_up',
+              'volume_down',
+              'mute_volume',
+            ],
+          },
+        },
+        required: ['action'],
+      },
+    },
+    handler: runDesktopAction,
+  },
+}
+
+export const toolDeclarations = Object.values(capabilityRegistry).map(
+  (capability) => capability.declaration,
+)
+
 export async function executeTool(name, args = {}) {
-  if (name === 'get_weather') return getWeather(args.location)
+  const capability = capabilityRegistry[name]
+  if (!capability) throw new Error('Unknown capability: ' + name)
+  return capability.handler(args)
+}
 
-  if (name === 'open_website') {
-    const url = resolveWebsite(args.destination)
-    return {
-      modelResult: {
-        prepared: true,
-        destination: args.destination,
-        note: 'The user must activate the browser action in the interface.',
-      },
-      action: {
-        type: 'open_url',
-        label: 'OPEN ' + String(args.destination || 'WEBSITE').toUpperCase(),
-        url,
-      },
-      hud: {
-        type: 'action',
-        title: 'Browser action prepared',
-        subtitle: args.destination,
-      },
-    }
-  }
-
-  if (name === 'search_web') {
-    const query = String(args.query || '').trim()
-    if (!query) throw new Error('Search query is empty.')
-
-    const url = 'https://www.google.com/search?q=' + encodeURIComponent(query)
-    return {
-      modelResult: {
-        prepared: true,
-        query,
-        note: 'A search action was prepared. Do not claim search results were read.',
-      },
-      action: {
-        type: 'open_url',
-        label: 'OPEN SEARCH',
-        url,
-      },
-      hud: {
-        type: 'action',
-        title: 'Web search prepared',
-        subtitle: query,
-      },
-    }
-  }
-
-  if (name === 'get_schedule') return getSchedule()
-  if (name === 'get_unread_emails') return getEmails()
-
-  throw new Error('Unknown tool: ' + name)
+export function listCapabilities() {
+  return Object.keys(capabilityRegistry)
 }
