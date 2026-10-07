@@ -263,7 +263,7 @@ function App() {
         <div className="brand-lockup">
           <div className="brand-core"><span>N</span></div>
           <div className="brand-copy">
-            <strong>NEXUS</strong>
+            <strong>ADONIS</strong>
             <small>UNDERSTAND / REASON / ANTICIPATE</small>
           </div>
         </div>
@@ -504,7 +504,7 @@ function App() {
       </div>
 
       <footer className="nexus-footer">
-        <span>NEXUS // BUILD 0.9</span>
+        <span>ADONIS // BUILD 0.9</span>
         <span>{googleStatus.connected ? 'GOOGLE LINKED' : 'GOOGLE OPTIONAL'}</span>
         <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
@@ -643,7 +643,7 @@ function BootSequence() {
       <div className="boot-reactor">
         <span /><span /><span /><i />
       </div>
-      <strong>NEXUS // CORE INITIALIZATION</strong>
+      <strong>ADONIS // CORE INITIALIZATION</strong>
       <div className="boot-matrix">
         <span>NEURAL LATTICE .......... ONLINE</span>
         <span>VOICE CHANNEL ........... ONLINE</span>
