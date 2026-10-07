@@ -93,7 +93,7 @@ app.post('/api/chat', async (req, res) => {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
     const input = [
-      'You are NEXUS, the intelligence core of a cinematic personal AI control interface.',
+      'You are ADONIS, the intelligence core of a cinematic personal AI control interface.',
       'Your visual interface is austere, industrial, precise, and high-energy. Your behavior must remain calm, safe, helpful, and controlled.',
       'Sound concise and capable. Use restrained technical language when it helps, but do not become theatrical or threatening.',
       'Never claim a real-world action occurred unless a tool result explicitly confirms it.',
@@ -206,5 +206,5 @@ app.use((req, res, next) => {
 })
 
 app.listen(port, () => {
-  console.log(`NEXUS server online at http://localhost:${port}`)
+  console.log(`ADONIS server online at http://localhost:${port}`)
 })
