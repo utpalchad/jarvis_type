@@ -1,43 +1,96 @@
 # JARVIS Type
 
-A cinematic, browser-based AI command interface inspired by high-end science-fiction HUDs.
+A cinematic browser-based AI command interface inspired by high-end science-fiction HUDs.
 
-## Current stage
+## Current stage: v0.2
 
-Version 0.1 contains the frontend foundation:
+Working now:
 
-- boot sequence
-- animated central AI core
-- diagnostic HUD panels
-- command input
+- cinematic boot sequence
+- animated AI core and HUD
+- secure Gemini backend
+- Gemini 3.7 Flash conversation
+- browser microphone input
+- browser text-to-speech output
+- conversation continuity
+- AI/voice status indicators
 - responsive layout
-- no paid services
-- no external AI API connected yet
+- no API key exposed to the React frontend
 
-## Run locally
+## Free-first stack
+
+- React + Vite
+- Express
+- Google GenAI SDK
+- Gemini 3.7 Flash free tier
+- browser Speech Recognition where supported
+- browser Speech Synthesis
+
+Free tiers have usage limits and can change.
+
+## Setup
+
+### 1. Install dependencies
 
 ```bash
 npm install
+```
+
+### 2. Create your local environment file
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Or create a file named `.env` in the project root.
+
+Put your Gemini API key inside:
+
+```env
+GEMINI_API_KEY=your_key_here
+PORT=3001
+```
+
+Do not commit `.env`.
+
+### 3. Run JARVIS
+
+```bash
 npm run dev
 ```
 
-Then open the local URL shown by Vite.
+Open the Vite URL shown in the terminal, usually:
 
-## Build
+```text
+http://localhost:5173
+```
+
+The backend runs on port 3001 and Vite proxies `/api` requests to it.
+
+## Voice
+
+Voice recognition works best in Chromium-based browsers. Click the circular microphone control, allow microphone permission, and speak. JARVIS will transcribe the command, send it to Gemini, and speak the response if VOICE ON is enabled.
+
+## Production
 
 ```bash
 npm run build
+npm start
 ```
 
-## Planned next steps
-
-1. Gemini integration
-2. voice input
-3. browser text-to-speech
-4. AI tool routing
-5. weather and calendar panels
-6. richer 3D core effects
+The Express server serves the built frontend and the private Gemini endpoint.
 
 ## Security
 
-Do not commit API keys. Store secrets in a local `.env` file.
+The Gemini API key is read only by the Node server. It is never embedded into the React bundle.
+
+## Next
+
+- AI tool routing
+- real weather tool
+- calendar integration
+- safe browser actions
+- richer 3D reactor
+- streaming responses
