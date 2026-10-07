@@ -136,6 +136,14 @@ function App() {
       const data = await response.json()
 
       if (!response.ok) {
+        if (data.locked) {
+          setUnlocked(false)
+          setStatus('LOCKED')
+          setReply('Enter keyword to continue.')
+          setLastCommand('ACCESS REQUIRED')
+          return
+        }
+
         throw new Error(data.error || 'AI request failed.')
       }
 
@@ -533,7 +541,7 @@ function App() {
     setToolLog([])
     setError('')
     window.speechSynthesis?.cancel()
-    setStatus('STANDBY')
+    setStatus(unlocked ? 'STANDBY' : 'LOCKED')
   }
 
   if (!booted) return <BootSequence />
