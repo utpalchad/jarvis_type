@@ -33,6 +33,8 @@ function App() {
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [aiOnline, setAiOnline] = useState(false)
   const [interactionId, setInteractionId] = useState(null)
+  const [chatHistory, setChatHistory] = useState([])
+  const [lastLatency, setLastLatency] = useState(null)
   const [hud, setHud] = useState(null)
   const [actions, setActions] = useState([])
   const [toolLog, setToolLog] = useState([])
@@ -100,7 +102,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: clean,
-          previousInteractionId: interactionId,
+          history: chatHistory.slice(-8),
         }),
       })
 
@@ -111,7 +113,15 @@ function App() {
       }
 
       setReply(data.reply)
-      setInteractionId(data.interactionId || null)
+      if (data.interactionId) setInteractionId(data.interactionId)
+      setChatHistory((current) =>
+        [
+          ...current,
+          { role: 'user', text: clean },
+          { role: 'assistant', text: data.reply },
+        ].slice(-8),
+      )
+      setLastLatency(Number.isFinite(data.latencyMs) ? data.latencyMs : null)
       setHud(data.hud || null)
       setActions(data.actions || [])
       setToolLog(data.toolLog || [])
@@ -124,7 +134,6 @@ function App() {
         window.setTimeout(() => setStatus('STANDBY'), 1600)
       }
 
-      refreshHealth()
     } catch (requestError) {
       setStatus('ERROR')
       setError(requestError.message)
@@ -233,6 +242,8 @@ function App() {
 
   function resetConversation() {
     setInteractionId(null)
+    setChatHistory([])
+    setLastLatency(null)
     setReply('Session reset. Neural core standing by.')
     setLastCommand('')
     setHud(null)
@@ -249,7 +260,7 @@ function App() {
     ['LANGUAGE MODELS', aiOnline ? 'ONLINE' : 'STANDBY'],
     ['MULTIMODAL CORE', 'ONLINE'],
     ['TOOL INTERFACE', aiOnline ? 'ONLINE' : 'STANDBY'],
-    ['MEMORY CORE', interactionId ? 'ONLINE' : 'SESSION'],
+    ['MEMORY CORE', chatHistory.length ? 'ONLINE' : 'SESSION'],
     ['SAFETY LAYER', 'ONLINE'],
   ]
 
@@ -384,7 +395,7 @@ function App() {
             </div>
           </div>
 
-          <HudPanel title="RESPONSE" status={error ? 'FAULT' : responseLatencyLabel(status)}>
+          <HudPanel title="RESPONSE" status={error ? 'FAULT' : responseLatencyLabel(status, lastLatency)}>
             <div className={'response-body ' + (error ? 'response-fault' : '')}>
               <Typewriter text={error || reply} />
             </div>
@@ -622,10 +633,11 @@ function useDate() {
   return formatter.format(new Date()).toUpperCase()
 }
 
-function responseLatencyLabel(status) {
+function responseLatencyLabel(status, latencyMs) {
   if (status === 'PROCESSING') return '...'
   if (status === 'ERROR') return 'FAULT'
-  return '2.3s'
+  if (Number.isFinite(latencyMs)) return (latencyMs / 1000).toFixed(1) + 's'
+  return 'READY'
 }
 
 function statusHeadline(status) {
