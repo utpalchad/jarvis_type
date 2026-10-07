@@ -24,7 +24,7 @@ A cinematic personal AI command interface with a contextual HUD, voice input/out
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22.12 or newer
 - npm
 - a Gemini API key from Google AI Studio
 - Chrome or another compatible Chromium browser for the best voice-recognition experience
