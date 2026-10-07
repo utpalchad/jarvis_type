@@ -21,7 +21,7 @@ const quickCommands = [
 ]
 
 function App() {
-  const [booted, setBooted] = useState(false)
+  const [booted, setBooted] = useState(true)
   const [command, setCommand] = useState('')
   const [lastCommand, setLastCommand] = useState('')
   const [status, setStatus] = useState('LOCKED')
@@ -193,7 +193,6 @@ function App() {
     setCommand('')
     setError('')
     setStatus('PROCESSING')
-    setReply('Verifying access keyword...')
 
     try {
       const response = await fetch('/api/unlock', {
@@ -454,7 +453,7 @@ function App() {
 
     recognition.onerror = (event) => {
       setListening(false)
-      setStatus('STANDBY')
+      setStatus(unlocked ? 'STANDBY' : 'LOCKED')
 
       if (event.error !== 'no-speech') {
         setError('Microphone error: ' + event.error)
@@ -466,7 +465,11 @@ function App() {
     recognition.onend = () => {
       setListening(false)
       setStatus((current) =>
-        current === 'LISTENING' ? 'STANDBY' : current,
+        current === 'LISTENING'
+          ? unlocked
+            ? 'STANDBY'
+            : 'LOCKED'
+          : current,
       )
 
       if (!heardCommand) resumeWakeRecognition()
@@ -544,7 +547,20 @@ function App() {
     setStatus(unlocked ? 'STANDBY' : 'LOCKED')
   }
 
-  if (!booted) return <BootSequence />
+  if (!booted) return null
+
+  if (!unlocked) {
+    return (
+      <LockScreen
+        command={command}
+        setCommand={setCommand}
+        onSubmit={submitCommand}
+        onMic={() => startListening()}
+        listening={listening}
+        processing={status === 'PROCESSING'}
+      />
+    )
+  }
 
   const systems = [
     ['LANGUAGE MODELS', aiOnline ? 'ONLINE' : 'STANDBY'],
@@ -830,10 +846,67 @@ function App() {
       </div>
 
       <footer className="nexus-footer">
-        <span>ADONIS // BUILD 1.1</span>
+        <span>ADONIS // BUILD 1.2</span>
         <span>{googleStatus.connected ? 'GOOGLE LINKED' : 'GOOGLE OPTIONAL'}</span>
         <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
+    </main>
+  )
+}
+
+function LockScreen({
+  command,
+  setCommand,
+  onSubmit,
+  onMic,
+  listening,
+  processing,
+}) {
+  return (
+    <main className="adonis-lock-screen">
+      <div className="adonis-lock-aura" />
+      <section className="adonis-lock-card" aria-label="ADONIS access">
+        <div className="adonis-lock-mark" aria-hidden="true">
+          <span>A</span>
+        </div>
+        <h1>ADONIS</h1>
+        <p>ENTER KEYWORD</p>
+
+        <form className="adonis-lock-form" onSubmit={onSubmit}>
+          <input
+            type="password"
+            value={command}
+            onChange={(event) => setCommand(event.target.value)}
+            placeholder="Enter keyword"
+            autoComplete="off"
+            autoFocus
+            disabled={processing || listening}
+            aria-label="Access keyword"
+          />
+
+          <button
+            type="submit"
+            className="adonis-lock-submit"
+            disabled={processing || listening || !command.trim()}
+            aria-label="Submit keyword"
+          >
+            ➤
+          </button>
+
+          <button
+            type="button"
+            className={'adonis-lock-mic ' + (listening ? 'is-listening' : '')}
+            onClick={onMic}
+            disabled={processing}
+            aria-label="Speak keyword"
+            title="Speak keyword"
+          >
+            ◉
+          </button>
+        </form>
+
+        <small>{listening ? 'LISTENING' : 'TYPE OR SPEAK KEYWORD'}</small>
+      </section>
     </main>
   )
 }
