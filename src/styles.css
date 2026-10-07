@@ -1565,3 +1565,589 @@ input:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* ===== Reference control-room pass v0.9 ===== */
+.nexus-reference-layout {
+  min-height: 100vh;
+  padding: 10px 16px 12px;
+  background:
+    radial-gradient(circle at 50% 43%, rgba(255, 88, 24, .15), transparent 22%),
+    radial-gradient(circle at 50% 56%, rgba(142, 31, 15, .09), transparent 38%),
+    linear-gradient(180deg, #060606 0%, #020202 78%, #050505 100%);
+}
+
+.nexus-reference-layout .nexus-header {
+  min-height: 68px;
+  padding: 0 22px;
+  background:
+    linear-gradient(90deg, rgba(255, 53, 33, .03), transparent 22% 78%, rgba(255, 53, 33, .03)),
+    linear-gradient(180deg, rgba(7, 7, 7, .98), rgba(2, 2, 2, .92));
+  border-color: rgba(255, 92, 53, .15);
+}
+
+.nexus-reference-layout .brand-copy strong {
+  font-size: 20px;
+  letter-spacing: .42em;
+}
+
+.nexus-reference-layout .brand-copy small {
+  margin-top: 4px;
+  letter-spacing: .23em;
+}
+
+.profile-control {
+  justify-self: end;
+  position: relative;
+  width: 37px;
+  height: 37px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 71, 45, .55);
+  border-radius: 50%;
+  background: rgba(4, 4, 4, .82);
+  color: #d6d6d6;
+  cursor: pointer;
+}
+
+.profile-control::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed rgba(255, 91, 54, .28);
+  border-radius: 50%;
+}
+
+.profile-control span {
+  position: relative;
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  color: transparent;
+  border: 1px solid #c5c7c7;
+  border-radius: 50%;
+}
+
+.profile-control span::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 13px;
+  height: 6px;
+  transform: translateX(-50%);
+  border: 1px solid #c5c7c7;
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+
+.nav-chevron {
+  display: grid;
+  place-items: center;
+  padding-left: 17px;
+  color: #777;
+  font: 300 31px Rajdhani, sans-serif;
+}
+
+.nexus-reference-layout .control-room {
+  grid-template-columns: minmax(240px, 285px) minmax(520px, 1fr) minmax(280px, 330px);
+  gap: 10px;
+  height: clamp(590px, calc(100vh - 190px), 760px);
+  min-height: 590px;
+  padding-top: 9px;
+}
+
+.nexus-reference-layout .left-console,
+.nexus-reference-layout .right-console {
+  gap: 9px;
+}
+
+.hud-panel-compact {
+  min-height: 80px;
+}
+
+.hud-panel-compact .hud-panel-head {
+  margin-bottom: 0;
+  padding-bottom: 2px;
+  border-bottom: 0;
+}
+
+.hud-panel-compact .assistant-wave {
+  position: absolute;
+  right: 12px;
+  top: 9px;
+  width: 92px;
+  opacity: .56;
+}
+
+.assistant-wave .mini-signal {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.assistant-wave .mini-signal svg {
+  height: 44px;
+}
+
+.section-divider {
+  height: 1px;
+  margin: 13px 0 11px;
+  background: linear-gradient(90deg, rgba(255, 92, 53, .13), rgba(255,255,255,.045), transparent);
+}
+
+.systems-title {
+  margin-bottom: 7px;
+  color: #d3d5d5;
+  font: 600 8px Rajdhani, sans-serif;
+  letter-spacing: .18em;
+}
+
+.nexus-reference-layout .system-row {
+  padding: 5px 0;
+}
+
+.nexus-reference-layout .metric-row {
+  grid-template-columns: 74px 1fr 38px;
+}
+
+.nexus-reference-layout .metric-row > i {
+  height: 2px;
+}
+
+.nexus-reference-layout .global-context-card {
+  min-height: 112px;
+  grid-template-columns: 130px 1fr;
+  padding: 9px;
+}
+
+.context-map em {
+  position: absolute;
+  left: 76%;
+  top: 23%;
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #ff5c38;
+  box-shadow: 0 0 7px rgba(255, 77, 42, .7);
+}
+
+.nexus-reference-layout .orb-chamber {
+  overflow: hidden;
+  border-color: rgba(255, 85, 45, .10);
+  background:
+    radial-gradient(circle at 50% 43%, rgba(255, 116, 41, .18), transparent 17%),
+    radial-gradient(circle at 50% 53%, rgba(126, 25, 12, .12), transparent 41%),
+    linear-gradient(180deg, rgba(8, 8, 8, .28), rgba(0, 0, 0, .75));
+  box-shadow:
+    inset 0 0 90px rgba(0, 0, 0, .60),
+    inset 0 -85px 105px rgba(0, 0, 0, .72),
+    0 0 45px rgba(255, 64, 29, .025);
+}
+
+.chamber-backplate {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 48%, transparent 0 30%, rgba(255, 80, 34, .08) 30.15% 30.45%, transparent 30.6% 37%, rgba(255, 114, 42, .045) 37.15% 37.35%, transparent 37.5%),
+    conic-gradient(from 4deg at 50% 48%, transparent 0 7deg, rgba(255, 93, 47, .045) 7.2deg 7.8deg, transparent 8deg 19deg, rgba(255, 106, 49, .03) 19.3deg 20deg, transparent 20.2deg 42deg);
+  opacity: .9;
+}
+
+.nexus-reference-layout .orb-chamber::before {
+  opacity: .72;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 74px, rgba(255, 91, 58, .027) 75px 76px),
+    repeating-linear-gradient(0deg, transparent 0 72px, rgba(255, 91, 58, .018) 73px 74px),
+    linear-gradient(90deg, rgba(255,255,255,.012), transparent 12% 88%, rgba(255,255,255,.012));
+}
+
+.nexus-reference-layout .orb-chamber::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 4%;
+  right: 4%;
+  bottom: 4%;
+  height: 22%;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 65, 28, .11), transparent),
+    repeating-linear-gradient(90deg, rgba(255, 105, 46, .055) 0 1px, transparent 1px 42px);
+  transform: perspective(330px) rotateX(63deg);
+  transform-origin: bottom center;
+  opacity: .48;
+}
+
+.strut-c {
+  left: 38%;
+  transform: rotate(12deg);
+}
+
+.strut-d {
+  right: 38%;
+  transform: rotate(-12deg);
+}
+
+.nexus-reference-layout .ceiling-strut {
+  top: -16%;
+  height: 51%;
+  background:
+    linear-gradient(transparent 0 10%, rgba(255,255,255,.14) 24%, rgba(255, 74, 40, .09) 62%, transparent 100%);
+}
+
+.nexus-reference-layout .core-scene-v2 {
+  inset: -2% -10% 7%;
+  z-index: 5;
+}
+
+.nexus-reference-layout .core-scene-v2 canvas {
+  filter:
+    drop-shadow(0 0 10px rgba(255, 116, 49, .36))
+    drop-shadow(0 0 34px rgba(255, 84, 26, .20))
+    drop-shadow(0 0 80px rgba(255, 54, 22, .08));
+}
+
+.nexus-reference-layout .orb-shadow {
+  bottom: 10.5%;
+  width: 58%;
+  height: 54px;
+  background:
+    radial-gradient(ellipse, rgba(255, 78, 25, .38), rgba(255, 104, 33, .10) 42%, transparent 75%);
+  filter: blur(9px);
+}
+
+.nexus-reference-layout .orb-pedestal {
+  bottom: 5%;
+  width: 61%;
+  height: 76px;
+  border-color: rgba(255, 91, 49, .27);
+  background:
+    radial-gradient(ellipse, rgba(255, 79, 29, .17), transparent 50%),
+    linear-gradient(180deg, rgba(33, 25, 20, .96), rgba(4, 4, 4, .96));
+  box-shadow:
+    0 -5px 24px rgba(255, 72, 29, .13),
+    0 12px 25px rgba(0,0,0,.56),
+    inset 0 2px 0 rgba(255, 137, 79, .18);
+}
+
+.nexus-reference-layout .core-caption {
+  bottom: .5%;
+}
+
+.sync-card {
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: 1fr 72px 102px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 92, 53, .11);
+  background:
+    linear-gradient(135deg, rgba(255, 60, 37, .025), transparent 44%),
+    rgba(5, 5, 5, .88);
+}
+
+.sync-wave {
+  min-width: 0;
+  height: 58px;
+  padding-right: 10px;
+  border-right: 1px solid rgba(255,255,255,.07);
+}
+
+.sync-wave .mini-signal {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sync-wave .mini-signal svg {
+  height: 56px;
+}
+
+.sync-copy small,
+.sync-copy strong,
+.sync-time b,
+.sync-time span {
+  display: block;
+}
+
+.sync-copy small {
+  color: #707475;
+  font: 500 6px Rajdhani, sans-serif;
+  letter-spacing: .16em;
+}
+
+.sync-copy strong {
+  margin-top: 5px;
+  color: #b6b9b9;
+  font: 500 7px Rajdhani, sans-serif;
+  letter-spacing: .15em;
+}
+
+.sync-copy strong i {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #6b2a24;
+}
+
+.sync-copy strong .sync-live {
+  background: var(--red);
+  box-shadow: 0 0 7px rgba(255, 61, 52, .65);
+}
+
+.sync-time {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 11px;
+  border-left: 1px solid rgba(255,255,255,.07);
+}
+
+.sync-time b {
+  color: #e2e3e3;
+  font: 400 22px Rajdhani, sans-serif;
+  letter-spacing: .09em;
+}
+
+.sync-time span {
+  margin-top: 4px;
+  color: #696d6e;
+  font: 500 6px Rajdhani, sans-serif;
+  letter-spacing: .14em;
+}
+
+.nexus-reference-layout .right-console .hud-panel:nth-child(2) {
+  flex: 1 1 0;
+  min-height: 245px;
+}
+
+.nexus-reference-layout .response-body {
+  min-height: 170px;
+  max-height: 260px;
+  padding: 14px 13px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,.016), transparent 52%),
+    rgba(6, 6, 6, .88);
+}
+
+.nexus-reference-layout .response-body p {
+  font-size: 10px;
+  line-height: 1.76;
+}
+
+.nexus-reference-layout .response-tags {
+  align-items: center;
+}
+
+.nexus-reference-layout .response-tags b {
+  margin-left: auto;
+  color: #8a5a4d;
+  letter-spacing: .18em;
+}
+
+.nexus-reference-layout .module-list {
+  gap: 10px;
+}
+
+.nexus-reference-layout .module-row {
+  grid-template-columns: 19px 1fr 80px;
+}
+
+.reference-command-deck {
+  z-index: 40;
+  width: min(950px, 72vw);
+  margin: -30px auto 0;
+}
+
+.reference-command-deck .command-console {
+  grid-template-columns: 66px 1fr 210px 72px;
+  height: 78px;
+  border-color: rgba(255, 89, 50, .30);
+  background:
+    linear-gradient(90deg, rgba(255, 58, 38, .045), transparent 12% 88%, rgba(255, 58, 38, .045)),
+    rgba(6, 6, 6, .97);
+  box-shadow:
+    0 18px 65px rgba(0,0,0,.66),
+    0 0 26px rgba(255, 56, 29, .035);
+}
+
+.deck-settings {
+  border: 0;
+  border-right: 1px solid rgba(255, 91, 51, .12);
+  background: transparent;
+  color: #949797;
+  cursor: pointer;
+  font-size: 21px;
+}
+
+.deck-settings span {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255,255,255,.11);
+  background: rgba(255,255,255,.015);
+}
+
+.reference-command-deck .command-input-wrap {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+}
+
+.reference-command-deck .command-input-wrap input {
+  font-size: 12px;
+}
+
+.command-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding-right: 9px;
+}
+
+.command-tools button {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #8c9191;
+  cursor: pointer;
+  font-size: 15px;
+  transition: .16s ease;
+}
+
+.command-tools button:hover {
+  color: #e5c9bc;
+  background: rgba(255, 78, 43, .06);
+}
+
+.command-tools .mic-active {
+  color: #ff7652;
+  text-shadow: 0 0 10px rgba(255, 78, 42, .55);
+}
+
+.reference-command-deck .execute-control {
+  margin: 9px;
+  border: 1px solid rgba(255, 63, 43, .7);
+  background: rgba(255, 44, 30, .045);
+  color: #ff4b37;
+  box-shadow:
+    inset 0 0 16px rgba(255, 65, 37, .04),
+    0 0 13px rgba(255, 48, 32, .05);
+}
+
+.reference-command-deck .execute-control:hover {
+  background: rgba(255, 63, 36, .10);
+  box-shadow: 0 0 20px rgba(255, 54, 33, .16);
+}
+
+.reference-command-deck .mode-strip {
+  gap: 8px 30px;
+  margin-top: 10px;
+}
+
+.reference-tagline {
+  position: fixed;
+  right: 22px;
+  bottom: 19px;
+  z-index: 20;
+  text-align: right;
+  pointer-events: none;
+}
+
+.reference-tagline strong,
+.reference-tagline span {
+  display: block;
+}
+
+.reference-tagline strong {
+  color: #54595a;
+  font: 600 7px Rajdhani, sans-serif;
+  letter-spacing: .24em;
+}
+
+.reference-tagline span {
+  margin-top: 5px;
+  color: #3c4142;
+  font: 500 6px Rajdhani, sans-serif;
+  letter-spacing: .23em;
+}
+
+.nexus-reference-layout .nexus-footer {
+  opacity: .64;
+  margin-top: 7px;
+}
+
+@media (max-width: 1220px) {
+  .nexus-reference-layout .control-room {
+    grid-template-columns: 220px minmax(430px, 1fr) 260px;
+  }
+
+  .reference-command-deck {
+    width: min(900px, 82vw);
+  }
+
+  .reference-command-deck .command-console {
+    grid-template-columns: 60px 1fr 180px 68px;
+  }
+}
+
+@media (max-width: 980px) {
+  .nexus-reference-layout .control-room {
+    height: auto;
+  }
+
+  .nexus-reference-layout .orb-chamber {
+    min-height: 620px;
+  }
+
+  .reference-command-deck {
+    margin-top: 10px;
+    width: min(820px, 96vw);
+  }
+
+  .reference-tagline {
+    display: none;
+  }
+
+  .sync-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .nexus-reference-layout .orb-chamber {
+    min-height: 520px;
+  }
+
+  .nexus-reference-layout .core-scene-v2 {
+    inset: -2% -24% 9%;
+  }
+
+  .reference-command-deck .command-console {
+    grid-template-columns: 52px 1fr 56px;
+    height: 62px;
+  }
+
+  .reference-command-deck .command-tools {
+    display: none;
+  }
+
+  .reference-command-deck .mode-strip {
+    gap: 6px 13px;
+  }
+}
