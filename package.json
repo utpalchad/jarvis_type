@@ -1,10 +1,10 @@
 {
   "name": "jarvis-type",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "concurrently \"vite\" \"node --watch server/server.js\"",
@@ -22,8 +22,8 @@
     "three": "0.186.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.3",
+    "@vitejs/plugin-react": "6.1.2",
     "concurrently": "^9.0.1",
-    "vite": "^5.4.10"
+    "vite": "8.3.3"
   }
 }
