@@ -1,35 +1,54 @@
-# JARVIS Type
+# NEXUS
 
-A cinematic personal AI command interface with a contextual HUD, voice input/output, a Three.js neural core, Gemini tool routing, weather, safe browser actions, and optional Google Calendar/Gmail access.
+A cinematic personal AI control interface with an original identity, visually influenced by hard-edged rogue-AI control rooms and refined assistant HUDs without copying film assets, logos, character likenesses, or source code.
 
-## Current build: 0.6
+## Build 0.8
 
-### Working
+### Interface
 
-- React + Vite interface
-- cinematic boot sequence
-- Three.js holographic core
-- state animations for standby, listening, processing, speaking, and error
-- browser speech recognition where supported
-- browser speech synthesis
-- Gemini 3.8 Flash conversation
-- Gemini function calling
-- Open-Meteo weather tool with no API key
-- safe browser/site actions that require a user click
-- web-search action that prepares a Google search URL
-- contextual weather/schedule/email/action HUD panels
-- optional Google Calendar read-only integration
-- optional Gmail read-only integration
-- private server-side API keys and local OAuth token storage
+- industrial black/gunmetal control-room layout
+- red framing with amber/orange energy
+- dense interactive Three.js neural core
+- pointer-reactive core rotation
+- click-reactive energy pulse
+- separate states for standby, listening, reasoning, speaking, and error
+- left-side core/system telemetry
+- right-side response, modules, and executor trace
+- bottom command console and quick modes
+- contextual weather, Calendar, Gmail, action, and local-agent HUDs
+- responsive laptop/tablet/mobile layout
 
-## Requirements
+### Intelligence
 
-- Node.js 22.12 or newer
-- npm
-- a Gemini API key from Google AI Studio
-- Chrome or another compatible Chromium browser for the best voice-recognition experience
+- Gemini conversation and tool calling
+- modular capability registry inspired by mature assistant executor architectures
+- Open-Meteo weather with no weather API key
+- safe browser actions that require visible user activation
+- Google Calendar read-only integration
+- Gmail read-only integration
+- optional trusted local desktop-agent bridge with a strict harmless-action allow-list
+
+The local-agent bridge currently recognizes only:
+
+```text
+open_vscode
+open_browser
+open_spotify
+open_github_desktop
+volume_up
+volume_down
+mute_volume
+```
+
+No arbitrary shell command capability is exposed.
 
 ## Quick start
+
+Requirements:
+
+- Node.js 22.12+
+- npm
+- Gemini API key
 
 ```bash
 git pull
@@ -38,13 +57,11 @@ npm install
 
 Copy the environment template:
 
-### Windows PowerShell
-
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Then edit `.env`:
+Add your Gemini key:
 
 ```env
 GEMINI_API_KEY=your_key_here
@@ -58,7 +75,7 @@ Run:
 npm run dev
 ```
 
-Open the Vite URL, normally:
+Open:
 
 ```text
 http://localhost:5173
@@ -71,30 +88,27 @@ Introduce yourself.
 What is the weather in Noida today?
 Should I carry an umbrella tomorrow in Delhi?
 Open YouTube.
-Open my GitHub.
-Search the web for the latest Gemini API documentation.
+Search the web for the latest Gemini documentation.
 What is on my schedule?
 Summarize my unread emails.
+Is my desktop companion online?
 ```
-
-Browser actions do not silently open. JARVIS prepares an action control in the contextual HUD and you choose whether to activate it.
 
 ## Google Calendar + Gmail
 
-This step is optional. JARVIS works without it.
+Google integration is optional.
 
 1. Create a Google Cloud project.
-2. Enable the Google Calendar API.
-3. Enable the Gmail API.
-4. Configure the Google OAuth consent screen.
-5. Create an OAuth 2.0 client with application type **Web application**.
-6. Add this authorized redirect URI:
+2. Enable Google Calendar API and Gmail API.
+3. Configure the OAuth consent screen.
+4. Create an OAuth 2.0 Web application.
+5. Register:
 
 ```text
 http://localhost:3001/api/google/callback
 ```
 
-7. Add the credentials to your local `.env`:
+6. Add to `.env`:
 
 ```env
 GOOGLE_CLIENT_ID=your_client_id
@@ -102,10 +116,32 @@ GOOGLE_CLIENT_SECRET=your_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:3001/api/google/callback
 ```
 
-8. Restart `npm run dev`.
-9. Click **LINK GOOGLE** inside JARVIS.
+7. Restart the app and use **LINK GOOGLE**.
 
-The app requests only read-only Calendar and Gmail scopes. OAuth tokens are stored locally inside `.jarvis/`, which is ignored by Git.
+The requested scopes are read-only.
+
+## Optional desktop companion
+
+The cloud website cannot directly control a Windows PC. NEXUS therefore includes a local-agent integration contract instead of pretending otherwise.
+
+The configured companion must expose:
+
+```text
+GET  /health
+POST /action
+Authorization: Bearer <LOCAL_AGENT_TOKEN>
+```
+
+`POST /action` receives only one of the allow-listed action names above.
+
+Set:
+
+```env
+LOCAL_AGENT_URL=https://your-trusted-agent-endpoint
+LOCAL_AGENT_TOKEN=a-long-random-secret
+```
+
+Keep these blank until you have a properly authenticated local companion. Do not make an unauthenticated desktop-control endpoint public.
 
 ## Architecture
 
@@ -113,20 +149,21 @@ The app requests only read-only Calendar and Gmail scopes. OAuth tokens are stor
 voice / keyboard
       |
       v
-React cinematic HUD
+React cinematic control room
       |
       v
 private Express server
       |
       v
-Gemini 3.8 Flash
+Gemini
       |
-      +--> normal answer
-      +--> weather tool --> Open-Meteo
-      +--> browser action --> user confirms
-      +--> search action --> user confirms
-      +--> calendar tool --> Google Calendar
-      +--> email tool --> Gmail
+      +--> normal reasoning
+      +--> weather executor --> Open-Meteo
+      +--> browser executor --> user confirms
+      +--> search executor --> user confirms
+      +--> Calendar executor --> Google Calendar
+      +--> Gmail executor --> Gmail
+      +--> desktop executor --> trusted local companion only
       |
       v
 contextual HUD + spoken response
@@ -139,12 +176,14 @@ npm run build
 npm start
 ```
 
-For a deployed Google OAuth setup, change `APP_URL` and `GOOGLE_REDIRECT_URI` to the deployed HTTPS URLs and register the same redirect URI in Google Cloud.
+For Render, set `APP_URL` to the Render URL. For deployed Google OAuth, register that HTTPS callback in Google Cloud as well.
 
-## Privacy and security
+## Security principles
 
-- Gemini API keys stay on the server.
-- Google OAuth credentials stay in `.env`.
-- Google OAuth tokens stay in the local `.jarvis/` folder.
+- Gemini key remains server-side.
+- OAuth credentials remain server-side.
+- Google access is read-only.
 - Browser actions require a visible user click.
-- JARVIS does not claim Calendar/Gmail access when those services are not connected.
+- Desktop actions use a strict allow-list.
+- No arbitrary shell-command tool is exposed.
+- Disconnected integrations are reported as disconnected rather than simulated.
