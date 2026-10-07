@@ -1,13 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
 import CoreScene from './components/CoreScene.jsx'
 import ContextHud from './components/ContextHud.jsx'
-import VoiceWaveform from './components/VoiceWaveform.jsx'
+
+const systemModules = [
+  ['LANGUAGE MODEL', 'ONLINE'],
+  ['MULTIMODAL CORE', 'ONLINE'],
+  ['TOOL INTERFACE', 'ONLINE'],
+  ['MEMORY CORE', 'SESSION'],
+  ['SAFETY LAYER', 'ONLINE'],
+]
+
+const activeModules = [
+  ['STRATEGIC ANALYSIS', 94],
+  ['CREATIVE GENERATION', 88],
+  ['CODE & ENGINEERING', 92],
+  ['RESEARCH & SYNTHESIS', 84],
+  ['PLANNING & AUTOMATION', 79],
+  ['VISION & MULTIMODAL', 73],
+]
 
 const quickCommands = [
-  ['WEATHER', 'What is the weather in Noida today?'],
-  ['SCHEDULE', 'What is on my schedule?'],
-  ['EMAIL', 'Summarize my unread emails.'],
-  ['SEARCH', 'Search the web for the latest Gemini API documentation.'],
+  ['REASON', 'Help me reason through this problem step by step.'],
+  ['SEARCH', 'Search the web for the latest information about '],
+  ['ANALYZE', 'Analyze this carefully: '],
+  ['CREATE', 'Help me create '],
+  ['PLAN', 'Plan my day efficiently.'],
+  ['EXECUTE', 'Open GitHub.'],
 ]
 
 function App() {
@@ -15,7 +33,7 @@ function App() {
   const [command, setCommand] = useState('')
   const [lastCommand, setLastCommand] = useState('')
   const [status, setStatus] = useState('STANDBY')
-  const [reply, setReply] = useState('Neural interface ready. Awaiting directive.')
+  const [reply, setReply] = useState('I’m ready. Ask anything.')
   const [error, setError] = useState('')
   const [listening, setListening] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
@@ -28,11 +46,15 @@ function App() {
     configured: false,
     connected: false,
   })
+  const [agentStatus, setAgentStatus] = useState({
+    configured: false,
+    online: false,
+  })
 
   const clock = useClock()
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setBooted(true), 2200)
+    const timer = window.setTimeout(() => setBooted(true), 2400)
     return () => window.clearTimeout(timer)
   }, [])
 
@@ -41,7 +63,7 @@ function App() {
 
     const params = new URLSearchParams(window.location.search)
     if (params.get('google') === 'connected') {
-      setReply('Google Calendar and Gmail link established.')
+      setReply('Google services linked. Calendar and Gmail channels are available.')
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
@@ -53,6 +75,9 @@ function App() {
       setAiOnline(Boolean(data.aiConfigured))
       setGoogleStatus(
         data.integrations?.google || { configured: false, connected: false },
+      )
+      setAgentStatus(
+        data.integrations?.localAgent || { configured: false, online: false },
       )
     } catch {
       setAiOnline(false)
@@ -100,14 +125,14 @@ function App() {
         speak(data.reply)
       } else {
         setStatus('READY')
-        window.setTimeout(() => setStatus('STANDBY'), 1800)
+        window.setTimeout(() => setStatus('STANDBY'), 1600)
       }
 
       refreshHealth()
     } catch (requestError) {
       setStatus('ERROR')
       setError(requestError.message)
-      setReply('AI link unavailable.')
+      setReply('Neural link unavailable.')
       window.setTimeout(() => setStatus('STANDBY'), 3200)
     }
   }
@@ -122,9 +147,7 @@ function App() {
       window.SpeechRecognition || window.webkitSpeechRecognition
 
     if (!SpeechRecognition) {
-      setError(
-        'Voice recognition is not supported by this browser. Use Chrome or type your command.',
-      )
+      setError('Voice recognition is not supported by this browser.')
       return
     }
 
@@ -170,20 +193,20 @@ function App() {
     }
 
     window.speechSynthesis.cancel()
-
     const utterance = new SpeechSynthesisUtterance(text)
     const voices = window.speechSynthesis.getVoices()
     const preferred =
       voices.find(
         (voice) =>
-          /en(-|_)GB/i.test(voice.lang) && /male|daniel|george/i.test(voice.name),
+          /en(-|_)GB/i.test(voice.lang) &&
+          /male|daniel|george|arthur/i.test(voice.name),
       ) || voices.find((voice) => /en(-|_)GB/i.test(voice.lang))
 
     if (preferred) utterance.voice = preferred
 
-    utterance.rate = 0.96
-    utterance.pitch = 0.82
-    utterance.volume = 0.94
+    utterance.rate = 0.93
+    utterance.pitch = 0.78
+    utterance.volume = 0.95
 
     utterance.onstart = () => setStatus('SPEAKING')
     utterance.onend = () => setStatus('STANDBY')
@@ -204,10 +227,7 @@ function App() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(
-          data.error ||
-            'Google OAuth is not configured in the server environment.',
-        )
+        throw new Error(data.error || 'Google OAuth is not configured.')
       }
 
       window.location.assign(data.url)
@@ -218,7 +238,7 @@ function App() {
 
   function resetConversation() {
     setInteractionId(null)
-    setReply('Conversation memory cleared. Awaiting directive.')
+    setReply('Session reset. Neural core standing by.')
     setLastCommand('')
     setHud(null)
     setActions([])
@@ -230,112 +250,151 @@ function App() {
 
   if (!booted) return <BootSequence />
 
-  const voiceActive =
-    listening || status === 'SPEAKING' || status === 'PROCESSING'
-
   return (
-    <main className="jarvis-shell">
-      <div className="ambient-grid" />
-      <div className="scan-sweep" />
-      <div className="screen-vignette" />
+    <main className="nexus-shell">
+      <div className="industrial-grid" />
+      <div className="red-scan" />
+      <div className="corner-vignette" />
 
-      <header className="command-header">
-        <div className="identity">
-          <span className="identity-glyph">J</span>
-          <div>
-            <strong>J.A.R.V.I.S</strong>
-            <small>NEURAL COMMAND INTERFACE</small>
+      <header className="nexus-header">
+        <div className="brand-lockup">
+          <div className="brand-core"><span>N</span></div>
+          <div className="brand-copy">
+            <strong>NEXUS</strong>
+            <small>UNDERSTAND / REASON / ANTICIPATE</small>
           </div>
         </div>
 
-        <div className="header-center">
-          <span className={aiOnline ? 'link-live' : 'link-warn'} />
-          {aiOnline ? 'AI CORE LINKED' : 'AI CORE UNPAIRED'}
-        </div>
+        <nav className="top-nav" aria-label="Primary">
+          <button className="nav-active">CORE</button>
+          <button onClick={() => setCommand('Show me your current capabilities.')}>CAPABILITIES</button>
+          <button onClick={() => setCommand('Give me a concise system status.')}>SYSTEM</button>
+          <button onClick={resetConversation}>SANDBOX</button>
+        </nav>
 
-        <div className="clock-block">
-          <small>LOCAL TIME</small>
-          <strong>{clock}</strong>
+        <div className="top-time">
+          <span className={aiOnline ? 'sync-dot sync-online' : 'sync-dot'} />
+          <div>
+            <small>{aiOnline ? 'SYNC STABLE' : 'SYNC DEGRADED'}</small>
+            <strong>{clock}</strong>
+          </div>
         </div>
       </header>
 
-      <section className="interface-stage">
-        <aside className="telemetry-rail telemetry-left">
-          <Telemetry label="RENDER" value="WEBGL" live />
-          <Telemetry
-            label="VOICE"
-            value={voiceEnabled ? 'ARMED' : 'MUTED'}
-            live={voiceEnabled}
-          />
-          <Telemetry
-            label="GEMINI"
-            value={aiOnline ? 'LINKED' : 'STANDBY'}
-            live={aiOnline}
-          />
-          <Telemetry
-            label="GOOGLE"
-            value={googleStatus.connected ? 'PAIRED' : 'UNPAIRED'}
-            live={googleStatus.connected}
-          />
+      <section className="control-room">
+        <aside className="left-console">
+          <HudPanel title="AI ASSISTANT" status={aiOnline ? 'ONLINE' : 'STANDBY'}>
+            <div className="metric-stack">
+              <Metric label="SYNTAX" value={100} />
+              <Metric label="REASONING" value={98} />
+              <Metric label="CONTEXT" value={96} />
+              <Metric label="ALIGNMENT" value={99} />
+            </div>
+          </HudPanel>
+
+          <HudPanel title="SYSTEMS">
+            <div className="system-list">
+              {systemModules.map(([label, fallback]) => {
+                let value = fallback
+                if (label === 'TOOL INTERFACE' && !aiOnline) value = 'STANDBY'
+                if (label === 'MEMORY CORE') value = interactionId ? 'ACTIVE' : 'SESSION'
+                return (
+                  <div className="system-row" key={label}>
+                    <span>{label}</span>
+                    <b className={value === 'ONLINE' || value === 'ACTIVE' ? 'state-live' : ''}>{value}</b>
+                  </div>
+                )
+              })}
+              <div className="system-row">
+                <span>GOOGLE LINK</span>
+                <b className={googleStatus.connected ? 'state-live' : ''}>
+                  {googleStatus.connected ? 'ONLINE' : 'OPTIONAL'}
+                </b>
+              </div>
+              <div className="system-row">
+                <span>LOCAL AGENT</span>
+                <b className={agentStatus.online ? 'state-live' : ''}>
+                  {agentStatus.online ? 'ONLINE' : agentStatus.configured ? 'OFFLINE' : 'UNPAIRED'}
+                </b>
+              </div>
+            </div>
+            <MiniSignal status={status} />
+          </HudPanel>
+
+          <div className="global-context-card">
+            <div className="context-map">
+              <span />
+              <i />
+              <b />
+            </div>
+            <div>
+              <small>GLOBAL CONTEXT</small>
+              <strong><em /> LIVE</strong>
+              <span>DATA STREAMS</span>
+              <b>{toolLog.length || 1} ACTIVE</b>
+            </div>
+          </div>
         </aside>
 
-        <section className="core-stage">
-          <div className="radial-scale radial-scale-one" />
-          <div className="radial-scale radial-scale-two" />
-
-          <div className="core-status-label core-status-left">
-            <span>STATE</span>
-            <strong>{status}</strong>
-          </div>
-
-          <div className="core-status-label core-status-right">
-            <span>MODEL</span>
-            <strong>GEMINI 3.8 FLASH</strong>
-          </div>
-
+        <section className="orb-chamber">
+          <div className="chamber-rail rail-left" />
+          <div className="chamber-rail rail-right" />
+          <div className="ceiling-strut strut-a" />
+          <div className="ceiling-strut strut-b" />
           <CoreScene status={status} />
-
-          <div className="core-readout">
-            <small>NEURAL CORE // 01</small>
-            <h1>{statusHeadline(status)}</h1>
-            <p>
-              {lastCommand
-                ? 'DIRECTIVE: ' + lastCommand
-                : 'Voice and text channels ready.'}
-            </p>
+          <div className="orb-shadow" />
+          <div className="orb-pedestal">
+            <span /><i /><b />
           </div>
 
-          <VoiceWaveform
-            active={voiceActive}
-            mode={
-              status === 'LISTENING'
-                ? 'LISTENING'
-                : status === 'SPEAKING'
-                  ? 'VOICE OUTPUT'
-                  : status === 'PROCESSING'
-                    ? 'NEURAL PROCESS'
-                    : 'STANDBY'
-            }
-          />
+          <div className="core-caption">
+            <span>NEURAL CORE // NX-01</span>
+            <strong>{statusHeadline(status)}</strong>
+            <small>
+              {lastCommand ? lastCommand : 'Higher intelligence, under deliberate control.'}
+            </small>
+          </div>
         </section>
 
-        <aside className="telemetry-rail telemetry-right">
-          <div className="trace-title">TOOL TRACE</div>
-          {toolLog.length ? (
-            toolLog.map((tool, index) => (
-              <div className="trace-row" key={tool.name + index}>
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <strong>{tool.name.replaceAll('_', ' ').toUpperCase()}</strong>
-                <i className={tool.status === 'complete' ? 'trace-ok' : ''}>
-                  {tool.status}
-                </i>
-              </div>
-            ))
-          ) : (
-            <div className="trace-empty">
-              Context modules deploy when required.
+        <aside className="right-console">
+          <HudPanel title="RESPONSE" status={error ? 'FAULT' : status}>
+            <div className={'response-body ' + (error ? 'response-fault' : '')}>
+              <Typewriter text={error || reply} />
             </div>
-          )}
+            <div className="response-tags">
+              <span>MULTIMODAL</span>
+              <span>TOOLS</span>
+              <span>REAL-TIME DATA</span>
+            </div>
+          </HudPanel>
+
+          <HudPanel title="ACTIVE MODULES">
+            <div className="module-list">
+              {activeModules.map(([label, score]) => (
+                <div className="module-row" key={label}>
+                  <span className="module-glyph">◇</span>
+                  <strong>{label}</strong>
+                  <i><b style={{ width: score + '%' }} /></i>
+                </div>
+              ))}
+            </div>
+          </HudPanel>
+
+          <HudPanel title="EXECUTION TRACE">
+            {toolLog.length ? (
+              <div className="trace-list">
+                {toolLog.slice(-5).map((tool, index) => (
+                  <div className="trace-item" key={tool.name + index}>
+                    <span>{String(index + 1).padStart(2, '0')}</span>
+                    <strong>{tool.name.replaceAll('_', ' ')}</strong>
+                    <b>{tool.status}</b>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="quiet-copy">No external tools invoked in this session.</p>
+            )}
+          </HudPanel>
         </aside>
 
         <ContextHud
@@ -346,86 +405,106 @@ function App() {
         />
       </section>
 
-      <section className={'neural-response ' + (error ? 'neural-error' : '')}>
-        <div className="response-meta">
-          <span>NEURAL RESPONSE // {interactionId ? interactionId.slice(-6).toUpperCase() : 'LOCAL'}</span>
-          <span>{error ? 'FAULT' : status}</span>
-        </div>
-        <Typewriter text={error || reply} />
-      </section>
-
-      <section className="command-zone">
-        <form className="command-dock" onSubmit={submitCommand}>
+      <section className="command-deck">
+        <form className="command-console" onSubmit={submitCommand}>
           <button
             type="button"
-            className={'voice-trigger ' + (listening ? 'voice-trigger-live' : '')}
+            className={'mic-control ' + (listening ? 'mic-active' : '')}
             onClick={startListening}
             aria-label="Start voice input"
           >
-            <span />
-            <i>MIC</i>
+            <span>◉</span>
           </button>
 
-          <div className="command-field">
-            <small>DIRECTIVE INPUT</small>
+          <div className="command-input-wrap">
+            <small>{listening ? 'VOICE CHANNEL OPEN' : 'DIRECTIVE CHANNEL'}</small>
             <input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
-              placeholder={listening ? 'Listening...' : 'Speak or enter a command'}
+              placeholder={listening ? 'Listening...' : 'Ask anything...'}
               disabled={status === 'PROCESSING'}
             />
           </div>
 
           <button
-            className="execute-command"
+            type="button"
+            className="voice-toggle"
+            onClick={() => setVoiceEnabled((value) => !value)}
+          >
+            {voiceEnabled ? 'VOICE' : 'MUTE'}
+          </button>
+
+          <button
+            className="execute-control"
             type="submit"
             disabled={status === 'PROCESSING'}
           >
-            EXECUTE <span>↗</span>
+            <span>➤</span>
           </button>
         </form>
 
-        <div className="command-shortcuts">
+        <div className="mode-strip">
           {quickCommands.map(([label, prompt]) => (
-            <button key={label} onClick={() => sendCommand(prompt)}>
-              {label}
+            <button
+              key={label}
+              className={label === 'REASON' ? 'mode-active' : ''}
+              onClick={() => {
+                if (prompt.endsWith(' ')) setCommand(prompt)
+                else sendCommand(prompt)
+              }}
+            >
+              <span /> {label}
             </button>
           ))}
-          <button onClick={() => setVoiceEnabled((value) => !value)}>
-            {voiceEnabled ? 'VOICE: ON' : 'VOICE: OFF'}
-          </button>
           {!googleStatus.connected && (
-            <button onClick={connectGoogle}>LINK GOOGLE</button>
+            <button onClick={connectGoogle}><span /> LINK GOOGLE</button>
           )}
-          <button onClick={resetConversation}>NEW SESSION</button>
         </div>
       </section>
 
-      <footer className="system-footer">
-        <span>JARVIS // BUILD 0.6</span>
-        <span>CONTEXTUAL HUD ACTIVE</span>
-        <span>THREE.JS CORE</span>
+      <footer className="nexus-footer">
+        <span>NEXUS // BUILD 0.8</span>
+        <span>GEMINI CORE</span>
+        <span>CONTEXTUAL EXECUTOR LAYER</span>
         <span>{navigator.onLine ? 'NETWORK ONLINE' : 'NETWORK OFFLINE'}</span>
       </footer>
     </main>
   )
 }
 
-function statusHeadline(status) {
-  if (status === 'LISTENING') return 'Listening.'
-  if (status === 'PROCESSING') return 'Analyzing.'
-  if (status === 'SPEAKING') return 'Responding.'
-  if (status === 'READY') return 'Directive complete.'
-  if (status === 'ERROR') return 'Link fault.'
-  return 'Awaiting directive.'
+function HudPanel({ title, status, children }) {
+  return (
+    <section className="hud-panel">
+      <div className="hud-panel-head">
+        <div>
+          <span className="panel-red-dot" />
+          <strong>{title}</strong>
+        </div>
+        {status && <small>{status}</small>}
+      </div>
+      {children}
+    </section>
+  )
 }
 
-function Telemetry({ label, value, live = false }) {
+function Metric({ label, value }) {
   return (
-    <div className="telemetry-item">
+    <div className="metric-row">
       <span>{label}</span>
-      <strong>{value}</strong>
-      <i className={live ? 'telemetry-live' : ''} />
+      <i><b style={{ width: value + '%' }} /></i>
+      <strong>{value}%</strong>
+    </div>
+  )
+}
+
+function MiniSignal({ status }) {
+  const boost = status === 'PROCESSING' || status === 'SPEAKING'
+  return (
+    <div className={'mini-signal ' + (boost ? 'signal-boost' : '')}>
+      <svg viewBox="0 0 280 54" preserveAspectRatio="none">
+        <polyline points="0,33 15,29 28,35 42,14 57,38 71,26 83,40 98,20 111,32 125,28 139,10 151,34 166,23 181,38 195,27 210,31 225,16 240,35 255,24 270,29 280,19" />
+      </svg>
+      <div><span>REAL-TIME PROCESSING</span><b>{boost ? 'BURST' : 'STABLE'}</b></div>
     </div>
   )
 }
@@ -435,20 +514,19 @@ function Typewriter({ text }) {
 
   useEffect(() => {
     const value = String(text || '')
-    if (value.length > 900) {
+    if (value.length > 1100) {
       setVisible(value)
       return undefined
     }
 
     setVisible('')
     let index = 0
-    const step = Math.max(1, Math.ceil(value.length / 110))
-
+    const step = Math.max(1, Math.ceil(value.length / 120))
     const timer = window.setInterval(() => {
       index = Math.min(value.length, index + step)
       setVisible(value.slice(0, index))
       if (index >= value.length) window.clearInterval(timer)
-    }, 14)
+    }, 12)
 
     return () => window.clearInterval(timer)
   }, [text])
@@ -481,22 +559,29 @@ function useClock() {
   return time
 }
 
+function statusHeadline(status) {
+  if (status === 'LISTENING') return 'Listening.'
+  if (status === 'PROCESSING') return 'Reasoning.'
+  if (status === 'SPEAKING') return 'Responding.'
+  if (status === 'READY') return 'Directive complete.'
+  if (status === 'ERROR') return 'System fault.'
+  return 'Awaiting directive.'
+}
+
 function BootSequence() {
   return (
-    <main className="boot-sequence">
-      <div className="boot-core">
-        <span />
-        <i />
-        <b />
+    <main className="boot-screen-v2">
+      <div className="boot-reactor">
+        <span /><span /><span /><i />
       </div>
-      <small>J.A.R.V.I.S // COLD START</small>
-      <div className="boot-log">
-        <span>RENDER ENGINE ............... ONLINE</span>
-        <span>VOICE SUBSYSTEM .............. ONLINE</span>
-        <span>NEURAL ROUTER ................ ONLINE</span>
-        <span>EXTERNAL TOOLS ............... ARMED</span>
+      <strong>NEXUS // CORE INITIALIZATION</strong>
+      <div className="boot-matrix">
+        <span>NEURAL LATTICE .......... ONLINE</span>
+        <span>VOICE CHANNEL ........... ONLINE</span>
+        <span>EXECUTOR FABRIC ......... ONLINE</span>
+        <span>SAFETY INTERLOCK ........ ONLINE</span>
       </div>
-      <div className="boot-track"><i /></div>
+      <div className="boot-line"><i /></div>
     </main>
   )
 }
