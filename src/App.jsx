@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const diagnostics = [
   ['CORE LOAD', '18%', 'nominal'],
@@ -17,22 +17,140 @@ function App() {
   const [booted, setBooted] = useState(false)
   const [command, setCommand] = useState('')
   const [status, setStatus] = useState('STANDBY')
+  const [reply, setReply] = useState('AI core initialized. Awaiting your directive.')
+  const [error, setError] = useState('')
+  const [listening, setListening] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [aiOnline, setAiOnline] = useState(false)
+  const [interactionId, setInteractionId] = useState(null)
+  const recognitionRef = useRef(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setBooted(true), 2300)
     return () => window.clearTimeout(timer)
   }, [])
 
+  useEffect(() => {
+    fetch('/api/health')
+      .then((response) => response.json())
+      .then((data) => setAiOnline(Boolean(data.aiConfigured)))
+      .catch(() => setAiOnline(false))
+  }, [])
+
   const clock = useClock()
+
+  async function sendCommand(text) {
+    const clean = String(text || '').trim()
+    if (!clean || status === 'PROCESSING') return
+
+    setCommand('')
+    setError('')
+    setStatus('PROCESSING')
+    setReply('Analyzing directive...')
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: clean,
+          previousInteractionId: interactionId,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'AI request failed.')
+      }
+
+      setReply(data.reply)
+      setInteractionId(data.interactionId || null)
+      setAiOnline(true)
+      setStatus('READY')
+
+      if (voiceEnabled) speak(data.reply)
+
+      window.setTimeout(() => setStatus('STANDBY'), 2200)
+    } catch (requestError) {
+      setStatus('ERROR')
+      setError(requestError.message)
+      setReply('AI link unavailable.')
+      window.setTimeout(() => setStatus('STANDBY'), 3000)
+    }
+  }
 
   function submitCommand(event) {
     event.preventDefault()
-    if (!command.trim()) return
+    sendCommand(command)
+  }
 
-    setStatus('PROCESSING')
-    window.setTimeout(() => setStatus('READY'), 850)
-    window.setTimeout(() => setStatus('STANDBY'), 2600)
-    setCommand('')
+  function startListening() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+
+    if (!SpeechRecognition) {
+      setError('Voice recognition is not supported by this browser. Use Chrome or type your command.')
+      return
+    }
+
+    if (!recognitionRef.current) {
+      const recognition = new SpeechRecognition()
+      recognition.lang = 'en-IN'
+      recognition.interimResults = false
+      recognition.continuous = false
+
+      recognition.onstart = () => {
+        setListening(true)
+        setStatus('LISTENING')
+        setError('')
+      }
+
+      recognition.onresult = (event) => {
+        const transcript = event.results?.[0]?.[0]?.transcript || ''
+        setCommand(transcript)
+        if (transcript.trim()) sendCommand(transcript)
+      }
+
+      recognition.onerror = (event) => {
+        setListening(false)
+        setStatus('STANDBY')
+        if (event.error !== 'no-speech') {
+          setError('Microphone error: ' + event.error)
+        }
+      }
+
+      recognition.onend = () => {
+        setListening(false)
+        setStatus((current) => current === 'LISTENING' ? 'STANDBY' : current)
+      }
+
+      recognitionRef.current = recognition
+    }
+
+    recognitionRef.current.start()
+  }
+
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 1
+    utterance.pitch = 0.88
+    utterance.volume = 0.92
+
+    utterance.onstart = () => setStatus('SPEAKING')
+    utterance.onend = () => setStatus('STANDBY')
+
+    window.speechSynthesis.speak(utterance)
+  }
+
+  function resetConversation() {
+    setInteractionId(null)
+    setReply('Conversation memory cleared. Awaiting directive.')
+    setError('')
+    window.speechSynthesis?.cancel()
+    setStatus('STANDBY')
   }
 
   if (!booted) return <BootSequence />
@@ -52,8 +170,8 @@ function App() {
         </div>
 
         <div className="top-status">
-          <span className="status-dot" />
-          <span>SYSTEM ONLINE</span>
+          <span className={'status-dot ' + (aiOnline ? '' : 'status-dot-warn')} />
+          <span>{aiOnline ? 'AI LINK ONLINE' : 'AI LINK STANDBY'}</span>
           <span className="divider" />
           <span>{clock}</span>
         </div>
@@ -65,9 +183,7 @@ function App() {
             <div className="diag-grid">
               {diagnostics.map(([label, value, meta]) => (
                 <div className="diag" key={label}>
-                  <div className="diag-ring">
-                    <span>{value}</span>
-                  </div>
+                  <div className="diag-ring"><span>{value}</span></div>
                   <div>
                     <strong>{label}</strong>
                     <small>{meta}</small>
@@ -82,14 +198,14 @@ function App() {
             <div className="security-row">
               <span className="security-icon">⌁</span>
               <div>
-                <strong>ENCRYPTED CHANNEL</strong>
-                <small>Local interface // protected</small>
+                <strong>PRIVATE AI CHANNEL</strong>
+                <small>API key remains server-side</small>
               </div>
             </div>
             <div className="micro-grid">
-              <span>NODE 01</span><span className="ok">ACTIVE</span>
-              <span>GATEWAY</span><span className="ok">LOCKED</span>
-              <span>AI LINK</span><span>OFFLINE</span>
+              <span>INTERFACE</span><span className="ok">ACTIVE</span>
+              <span>VOICE</span><span className="ok">LOCAL</span>
+              <span>GEMINI</span><span className={aiOnline ? 'ok' : ''}>{aiOnline ? 'ONLINE' : 'STANDBY'}</span>
             </div>
           </Panel>
         </aside>
@@ -99,18 +215,15 @@ function App() {
             <small>INTERFACE MODE</small>
             <strong>COMMAND</strong>
           </div>
+
           <div className="core-label core-label-right">
             <small>AI CORE</small>
             <strong>{status}</strong>
           </div>
 
           <div className={'reactor ' + status.toLowerCase()}>
-            <div className="orbit orbit-a">
-              <i /><i /><i />
-            </div>
-            <div className="orbit orbit-b">
-              <i /><i />
-            </div>
+            <div className="orbit orbit-a"><i /><i /><i /></div>
+            <div className="orbit orbit-b"><i /><i /></div>
             <div className="orbit orbit-c" />
             <div className="reticle reticle-one" />
             <div className="reticle reticle-two" />
@@ -126,28 +239,46 @@ function App() {
 
           <div className="core-copy">
             <p>NEURAL INTERFACE</p>
-            <h1>Awaiting directive.</h1>
-            <span>AI services will connect here in the next stage.</span>
+            <h1>{status === 'LISTENING' ? 'Listening.' : status === 'PROCESSING' ? 'Thinking.' : status === 'SPEAKING' ? 'Responding.' : 'Awaiting directive.'}</h1>
+            <span>Gemini 3.7 Flash // voice interface // secure backend</span>
+          </div>
+
+          <div className={'response-console ' + (error ? 'response-error' : '')}>
+            <div className="response-head">
+              <span>JARVIS RESPONSE</span>
+              <span>{status}</span>
+            </div>
+            <p>{error || reply}</p>
           </div>
 
           <form className="command-bar" onSubmit={submitCommand}>
-            <button type="button" className="mic-btn" aria-label="Voice input">
+            <button
+              type="button"
+              className={'mic-btn ' + (listening ? 'mic-listening' : '')}
+              aria-label="Voice input"
+              onClick={startListening}
+              title="Voice input"
+            >
               <span>◉</span>
             </button>
+
             <input
               value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              placeholder="Enter a command..."
+              onChange={(event) => setCommand(event.target.value)}
+              placeholder={listening ? 'Listening...' : 'Enter a command...'}
               aria-label="Command input"
+              disabled={status === 'PROCESSING'}
             />
+
             <kbd>ENTER</kbd>
-            <button className="send-btn" type="submit" aria-label="Send command">↗</button>
+            <button className="send-btn" type="submit" aria-label="Send command" disabled={status === 'PROCESSING'}>↗</button>
           </form>
 
           <div className="quick-actions">
-            <button onClick={() => setCommand('Analyze current system status')}>ANALYZE</button>
-            <button onClick={() => setCommand('Plan my day')}>PLAN</button>
-            <button onClick={() => setCommand('Open project workspace')}>WORKSPACE</button>
+            <button onClick={() => sendCommand('Introduce yourself briefly.')}>INTRO</button>
+            <button onClick={() => sendCommand('Help me plan what I should work on today.')}>PLAN</button>
+            <button onClick={() => setVoiceEnabled((value) => !value)}>{voiceEnabled ? 'VOICE ON' : 'VOICE OFF'}</button>
+            <button onClick={resetConversation}>NEW SESSION</button>
           </div>
         </section>
 
@@ -157,12 +288,9 @@ function App() {
               <div className="temperature">--°</div>
               <div>
                 <strong>WEATHER LINK</strong>
-                <small>Not connected</small>
+                <small>Tool not connected yet</small>
               </div>
-              <div className="radar">
-                <span />
-                <i />
-              </div>
+              <div className="radar"><span /><i /></div>
             </div>
           </Panel>
 
@@ -184,8 +312,9 @@ function App() {
           <Panel eyebrow="AI STATUS" title="Core services">
             <div className="service-list">
               <Service label="Interface" active />
-              <Service label="Voice input" />
-              <Service label="Gemini" />
+              <Service label="Voice input" active />
+              <Service label="Voice output" active={voiceEnabled} />
+              <Service label="Gemini" active={aiOnline} />
               <Service label="Tool routing" />
             </div>
           </Panel>
@@ -193,9 +322,9 @@ function App() {
       </section>
 
       <footer className="footer-strip">
-        <span>JARVIS // PROTOTYPE 0.1</span>
-        <span>LOCAL MODE</span>
-        <span>NO EXTERNAL SERVICES CONNECTED</span>
+        <span>JARVIS // PROTOTYPE 0.2</span>
+        <span>GEMINI 3.7 FLASH</span>
+        <span>{aiOnline ? 'AI CORE CONNECTED' : 'ADD API KEY TO ACTIVATE AI'}</span>
       </footer>
     </main>
   )
@@ -225,16 +354,13 @@ function useClock() {
 function BootSequence() {
   return (
     <main className="boot-screen">
-      <div className="boot-reticle">
-        <span />
-        <i />
-      </div>
+      <div className="boot-reticle"><span /><i /></div>
       <p>J.A.R.V.I.S // INITIALIZATION</p>
       <div className="boot-lines">
         <span>CORE INTERFACE ........ OK</span>
-        <span>DISPLAY MATRIX ........ OK</span>
+        <span>VOICE SUBSYSTEM ....... OK</span>
         <span>SECURE CHANNEL ........ OK</span>
-        <span>AI SERVICES ........... STANDBY</span>
+        <span>AI SERVICES ........... CHECKING</span>
       </div>
       <div className="boot-progress"><i /></div>
     </main>
